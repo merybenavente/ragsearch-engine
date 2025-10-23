@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from threading import RLock
 from ..domain.models import Library, LibraryID, Document, DocumentID, Chunk, ChunkID
+from .logging import LoggerMixin, log_performance
+import time
 
 
 class LibraryRepository(ABC):
@@ -33,36 +35,78 @@ class LibraryRepository(ABC):
         pass
 
 
-class InMemoryLibraryRepository(LibraryRepository):
+class InMemoryLibraryRepository(LibraryRepository, LoggerMixin):
     """In-memory implementation of library repository with thread safety"""
 
     def __init__(self):
         self._libraries: Dict[LibraryID, Library] = {}
         self._lock = RLock()  # Reentrant lock for thread safety
+        self.logger.info("InMemoryLibraryRepository initialized")
 
     def save(self, library: Library) -> Library:
         """Save a library (insert or update)"""
+        start_time = time.time()
         with self._lock:
+            is_update = library.id in self._libraries
             self._libraries[library.id] = library
+            
+            duration_ms = (time.time() - start_time) * 1000
+            log_performance(
+                operation="library_save",
+                duration_ms=duration_ms,
+                library_id=library.id,
+                is_update=is_update
+            )
+            
+            self.logger.info(
+                "Library saved",
+                library_id=library.id,
+                library_name=library.name,
+                is_update=is_update,
+                document_count=len(library.documents)
+            )
             return library
 
     def find_by_id(self, library_id: LibraryID) -> Optional[Library]:
         """Find library by ID"""
         with self._lock:
-            return self._libraries.get(library_id)
+            library = self._libraries.get(library_id)
+            self.logger.debug(
+                "Library lookup",
+                library_id=library_id,
+                found=library is not None
+            )
+            return library
 
     def find_all(self) -> List[Library]:
         """Get all libraries"""
         with self._lock:
-            return list(self._libraries.values())
+            libraries = list(self._libraries.values())
+            self.logger.debug(
+                "Retrieved all libraries",
+                count=len(libraries)
+            )
+            return libraries
 
     def delete(self, library_id: LibraryID) -> bool:
         """Delete a library"""
         with self._lock:
             if library_id in self._libraries:
+                library = self._libraries[library_id]
                 del self._libraries[library_id]
+                self.logger.info(
+                    "Library deleted",
+                    library_id=library_id,
+                    library_name=library.name,
+                    document_count=len(library.documents)
+                )
                 return True
-            return False
+            else:
+                self.logger.warning(
+                    "Attempted to delete non-existent library",
+                    library_id=library_id
+                )
+                return False
 
     def exists(self, library_id: LibraryID) -> bool:
         """Check if library exists"""
