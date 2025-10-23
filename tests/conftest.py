@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures"""
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
@@ -12,6 +13,10 @@ def pytest_configure(config):
     """Configure pytest settings"""
     # Configure logging for tests
     configure_logging(level=LogLevel.ERROR, json_format=False)
+
+
+# Configure asyncio mode for pytest-asyncio
+pytest_asyncio.asyncio_mode = "auto"
 
 
 @pytest.fixture

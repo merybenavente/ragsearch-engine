@@ -1,13 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import Annotated, List, Optional
+from typing import List, Optional
 from datetime import datetime
 from uuid import uuid4
 import random
 
 
-ChunkID = Annotated[str, Field(description="Unique chunk identifier")]
-DocumentID = Annotated[str, Field(description="Unique document identifier")]
-LibraryID = Annotated[str, Field(description="Unique library identifier")]
+ChunkID = str
+DocumentID = str
+LibraryID = str
 
 
 class Metadata(BaseModel):
@@ -85,7 +85,7 @@ class Document(BaseModel):
         - Atomic updates (all or nothing)
         - Predictable chunking behavior
         """
-        if not text or not text.strip():
+        if not text:
             # Empty content = no chunks
             return self.model_copy(update={
                 'chunks': [],
@@ -116,7 +116,7 @@ class Document(BaseModel):
         chunks = []
 
         for i in range(0, len(text), chunk_size):
-            chunk_text = text[i:i + chunk_size].strip()
+            chunk_text = text[i:i + chunk_size]
             if chunk_text:  # Only create non-empty chunks
                 chunk = Chunk(
                     document_id=self.id,

@@ -1,100 +1,84 @@
+"""Test basic API functionality and imports"""
+
 import pytest
 
 
 def test_basic_imports():
     """Test that the API functions can be imported"""
     try:
-        from classes.init_api import create_document, create_library
-        from classes.models import Document, Library, Metadata
+        from src.vector_db.application import services
+        from src.vector_db.domain.models import Document, Library, Metadata
+        from src.vector_db.api.main import app
         assert True
     except ImportError as e:
         pytest.fail(f"Import failed: {e}")
 
 
-# The following tests are commented out due to issues in the base classes
-# that need to be fixed first. Here's what the tests would look like:
-
-"""
-def test_create_document_with_text():
-    from classes.init_api import create_document
+def test_create_document_function():
+    """Test the create_document service function"""
+    from src.vector_db.application.services import DocumentService
 
     library_id = "lib_123"
-    name = "Al Mar"
-    author = "Manel"
-    text = '''Al mar me'n vaig
-    Amb el cor trencat
-    I les onades em parlen
-    D'allò que he perdut'''
-    tags = ["catalan", "indie", "rock"]
+    text = "Test document content"
+    username = "testuser"
+    tags = ["test", "example"]
 
-    document = create_document(
-        name=name,
+    document = DocumentService.create_document(
         library_id=library_id,
         text=text,
-        author=author,
+        username=username,
         tags=tags
     )
 
-    assert document.name == name
     assert document.library_id == library_id
-    assert document.metadata.author == author
+    assert document.metadata.username == username
     assert document.metadata.tags == tags
     assert len(document.chunks) > 0
+    assert document.has_content()
 
 
-def test_create_library_basic():
-    from classes.init_api import create_library
+def test_create_library_function():
+    """Test the create_library service function"""
+    from src.vector_db.application.services import LibraryService
 
-    name = "Maria's Music"
-    author = "Maria"
-    tags = ["catalan", "indie"]
+    name = "Test Library"
+    username = "testuser"
+    tags = ["test", "example"]
 
-    library = create_library(
+    library = LibraryService.create_library(
         name=name,
-        author=author,
+        username=username,
         tags=tags
     )
 
     assert library.name == name
-    assert library.metadata.author == author
+    assert library.metadata.username == username
     assert library.metadata.tags == tags
     assert len(library.documents) == 0
 
 
-def test_manel_songs_integration():
-    from classes.init_api import create_document, create_library
+def test_integration_example():
+    """Test creating library and adding documents"""
+    from src.vector_db.application.services import LibraryService, DocumentService
 
     # Create library
-    library = create_library(
-        name="Maria's Music Collection",
-        author="Maria",
+    library = LibraryService.create_library(
+        name="Music Collection",
+        username="Maria",
         tags=["personal", "favorites"]
     )
 
-    # Create documents with Manel songs
-    doc1 = create_document(
-        name="Al Mar",
+    # Create document
+    document = DocumentService.create_document(
         library_id=library.id,
-        text="Al mar me'n vaig amb el cor trencat",
-        author="Manel"
+        text="This is a song about the sea",
+        username="Maria",
+        tags=["catalan", "indie"]
     )
 
-    doc2 = create_document(
-        name="Boomerang",
-        library_id=library.id,
-        text="Boomerang que torna al lloc d'on va sortir",
-        author="Manel"
-    )
+    # Add document to library
+    updated_library = LibraryService.add_document_to_library(library, document)
 
-    doc3 = create_document(
-        name="Teresa Rampell",
-        library_id=library.id,
-        text="Teresa Rampell, no et puc treure del cap",
-        author="Manel"
-    )
-
-    assert doc1.library_id == library.id
-    assert doc2.library_id == library.id
-    assert doc3.library_id == library.id
-    assert all(doc.metadata.author == "Manel" for doc in [doc1, doc2, doc3])
-"""
+    assert len(updated_library.documents) == 1
+    assert updated_library.documents[0].id == document.id
+    assert updated_library.documents[0].library_id == library.id

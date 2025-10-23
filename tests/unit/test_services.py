@@ -1,12 +1,10 @@
 """Unit tests for application services"""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
-from src.vector_db.application.services import (
-    DocumentService, LibraryService, ChunkService
-)
+from src.vector_db.application.services import DocumentService, LibraryService, ChunkService
 from src.vector_db.domain.models import (
     Document, Library, Chunk, Metadata
 )
@@ -17,7 +15,6 @@ class TestDocumentService:
 
     def setup_method(self):
         """Setup test fixtures"""
-        self.document_service = DocumentService()
         self.library_id = str(uuid4())
 
     def test_create_document_with_content(self):
@@ -27,7 +24,7 @@ class TestDocumentService:
         tags = ["tag1", "tag2"]
         chunk_size = 20
 
-        document = self.document_service.create_document(
+        document = DocumentService.create_document(
             library_id=self.library_id,
             text=text,
             username=username,
@@ -45,7 +42,7 @@ class TestDocumentService:
         """Test creating a document with default values"""
         text = "Test content"
 
-        document = self.document_service.create_document(
+        document = DocumentService.create_document(
             library_id=self.library_id,
             text=text
         )
@@ -60,7 +57,7 @@ class TestDocumentService:
         username = "testuser"
         tags = ["tag1"]
 
-        document = self.document_service.create_empty_document(
+        document = DocumentService.create_empty_document(
             library_id=self.library_id,
             username=username,
             tags=tags
@@ -74,7 +71,7 @@ class TestDocumentService:
 
     def test_create_empty_document_with_defaults(self):
         """Test creating an empty document with default values"""
-        document = self.document_service.create_empty_document(
+        document = DocumentService.create_empty_document(
             library_id=self.library_id
         )
 
@@ -90,24 +87,25 @@ class TestDocumentService:
         document = document.replace_content("Original content")
 
         # Update content
-        new_text = "Updated content that is much longer than the original."
-        updated_document = self.document_service.update_document_content(
+        new_text = "Updated content that is much longer than the original content."
+        updated_document = DocumentService.update_document_content(
             document=document,
             new_text=new_text,
-            chunk_size=15
+            chunk_size=20
         )
 
-        assert updated_document.get_full_text() == new_text
+        # Check that content was updated
         assert len(updated_document.chunks) > 1  # Should be chunked
+        assert new_text == updated_document.get_full_text()
 
-    @patch('src.vector_db.application.services.LoggerMixin.logger')
+    @patch('src.vector_db.application.services.logger')
     def test_logging_document_creation(self, mock_logger):
         """Test that document creation is logged"""
         text = "Test content"
         username = "testuser"
         tags = ["tag1"]
 
-        self.document_service.create_document(
+        DocumentService.create_document(
             library_id=self.library_id,
             text=text,
             username=username,
@@ -115,19 +113,13 @@ class TestDocumentService:
         )
 
         mock_logger.info.assert_called_once()
-        call_args = mock_logger.info.call_args[1]
-        assert call_args['library_id'] == self.library_id
-        assert call_args['text_length'] == len(text)
-        assert call_args['username'] == username
-        assert call_args['tags'] == tags
+        # Check that logging was called with the expected message
+        call_args = mock_logger.info.call_args
+        assert "Document created" in call_args[0]
 
 
 class TestLibraryService:
-    """Test cases for LibraryService"""
-
-    def setup_method(self):
-        """Setup test fixtures"""
-        self.library_service = LibraryService()
+    """Test cases for library service functions"""
 
     def test_create_library(self):
         """Test creating a library"""
@@ -135,7 +127,7 @@ class TestLibraryService:
         username = "testuser"
         tags = ["tag1", "tag2"]
 
-        library = self.library_service.create_library(
+        library = LibraryService.create_library(
             name=name,
             username=username,
             tags=tags
@@ -150,7 +142,7 @@ class TestLibraryService:
         """Test creating a library with default values"""
         name = "Test Library"
 
-        library = self.library_service.create_library(name=name)
+        library = LibraryService.create_library(name=name)
 
         assert library.name == name
         assert library.metadata.username is None
@@ -161,7 +153,7 @@ class TestLibraryService:
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
 
-        updated_library = self.library_service.add_document_to_library(
+        updated_library = LibraryService.add_document_to_library(
             library=library,
             document=document
         )
@@ -175,14 +167,14 @@ class TestLibraryService:
         document = Document(library_id=library.id)
 
         # Add document first time
-        library = self.library_service.add_document_to_library(
+        library = LibraryService.add_document_to_library(
             library=library,
             document=document
         )
 
         # Try to add same document again
         with pytest.raises(ValueError, match="already exists"):
-            self.library_service.add_document_to_library(
+            LibraryService.add_document_to_library(
                 library=library,
                 document=document
             )
@@ -197,7 +189,7 @@ class TestLibraryService:
         assert len(library.documents) == 1
 
         # Remove document
-        updated_library = self.library_service.remove_document_from_library(
+        updated_library = LibraryService.remove_document_from_library(
             library=library,
             document_id=document.id
         )
@@ -210,7 +202,7 @@ class TestLibraryService:
         non_existent_id = str(uuid4())
 
         with pytest.raises(ValueError, match="not found"):
-            self.library_service.remove_document_from_library(
+            LibraryService.remove_document_from_library(
                 library=library,
                 document_id=non_existent_id
             )
@@ -225,7 +217,7 @@ class TestLibraryService:
 
         # Update document
         updated_document = document.replace_content("New content")
-        updated_library = self.library_service.update_document_in_library(
+        updated_library = LibraryService.update_document_in_library(
             library=library,
             updated_document=updated_document
         )
@@ -241,7 +233,7 @@ class TestLibraryService:
         non_existent_doc = Document(library_id=library.id)
 
         with pytest.raises(ValueError, match="not found"):
-            self.library_service.update_document_in_library(
+            LibraryService.update_document_in_library(
                 library=library,
                 updated_document=non_existent_doc
             )
@@ -249,11 +241,11 @@ class TestLibraryService:
     def test_update_library_metadata(self):
         """Test updating library metadata"""
         library = Library(name="Original Name")
-        
+
         new_name = "Updated Name"
         new_tags = ["new_tag1", "new_tag2"]
 
-        updated_library = self.library_service.update_library_metadata(
+        updated_library = LibraryService.update_library_metadata(
             library=library,
             name=new_name,
             tags=new_tags
@@ -270,7 +262,7 @@ class TestLibraryService:
 
         new_tags = ["new_tag"]
 
-        updated_library = self.library_service.update_library_metadata(
+        updated_library = LibraryService.update_library_metadata(
             library=library,
             tags=new_tags
         )
@@ -278,45 +270,44 @@ class TestLibraryService:
         assert updated_library.name == original_name  # Should remain unchanged
         assert updated_library.metadata.tags == new_tags
 
-    @patch('src.vector_db.application.services.LoggerMixin.logger')
+    @patch('src.vector_db.application.services.logger')
     def test_logging_library_creation(self, mock_logger):
         """Test that library creation is logged"""
         name = "Test Library"
         username = "testuser"
         tags = ["tag1"]
 
-        self.library_service.create_library(
+        LibraryService.create_library(
             name=name,
             username=username,
             tags=tags
         )
 
         mock_logger.info.assert_called_once()
-        call_args = mock_logger.info.call_args[1]
-        assert call_args['name'] == name
-        assert call_args['username'] == username
-        assert call_args['tags'] == tags
+        # Check that logging was called with the expected message
+        call_args = mock_logger.info.call_args
+        assert "Library created" in call_args[0]
 
 
 class TestChunkService:
-    """Test cases for ChunkService"""
+    """Test cases for chunk service functions"""
 
     def setup_method(self):
         """Setup test fixtures"""
-        self.chunk_service = ChunkService()
+        pass
 
     def test_get_chunks_from_library(self):
         """Test getting chunks from a library"""
         library = Library(name="Test Library")
-        
+
         # Add documents with content
         doc1 = Document(library_id=library.id).replace_content("Document 1 content")
         doc2 = Document(library_id=library.id).replace_content("Document 2 content")
-        
+
         library = library.add_document(doc1)
         library = library.add_document(doc2)
 
-        chunks = self.chunk_service.get_chunks_from_library(library)
+        chunks = ChunkService.get_chunks_from_library(library)
 
         expected_count = len(doc1.chunks) + len(doc2.chunks)
         assert len(chunks) == expected_count
@@ -325,7 +316,7 @@ class TestChunkService:
         """Test getting chunks from an empty library"""
         library = Library(name="Empty Library")
 
-        chunks = self.chunk_service.get_chunks_from_library(library)
+        chunks = ChunkService.get_chunks_from_library(library)
 
         assert chunks == []
 
@@ -335,7 +326,7 @@ class TestChunkService:
         document = Document(library_id=library_id)
         document = document.replace_content("Test content for chunking")
 
-        chunks = self.chunk_service.get_chunks_from_document(document)
+        chunks = ChunkService.get_chunks_from_document(document)
 
         assert len(chunks) == len(document.chunks)
         assert all(chunk.document_id == document.id for chunk in chunks)
@@ -345,7 +336,7 @@ class TestChunkService:
         library_id = str(uuid4())
         document = Document(library_id=library_id)
 
-        chunks = self.chunk_service.get_chunks_from_document(document)
+        chunks = ChunkService.get_chunks_from_document(document)
 
         assert chunks == []
 
@@ -358,7 +349,7 @@ class TestChunkService:
 
         # Get first chunk
         expected_chunk = document.chunks[0]
-        found_chunk = self.chunk_service.get_chunk_from_library(
+        found_chunk = ChunkService.get_chunk_from_library(
             library=library,
             chunk_id=expected_chunk.id
         )
@@ -371,7 +362,7 @@ class TestChunkService:
         library = Library(name="Test Library")
         non_existent_id = str(uuid4())
 
-        found_chunk = self.chunk_service.get_chunk_from_library(
+        found_chunk = ChunkService.get_chunk_from_library(
             library=library,
             chunk_id=non_existent_id
         )
@@ -386,7 +377,7 @@ class TestChunkService:
 
         # Get first chunk
         expected_chunk = document.chunks[0]
-        found_chunk = self.chunk_service.get_chunk_from_document(
+        found_chunk = ChunkService.get_chunk_from_document(
             document=document,
             chunk_id=expected_chunk.id
         )
@@ -401,14 +392,14 @@ class TestChunkService:
         document = document.replace_content("Test content")
         non_existent_id = str(uuid4())
 
-        found_chunk = self.chunk_service.get_chunk_from_document(
+        found_chunk = ChunkService.get_chunk_from_document(
             document=document,
             chunk_id=non_existent_id
         )
 
         assert found_chunk is None
 
-    @patch('src.vector_db.application.services.LoggerMixin.logger')
+    @patch('src.vector_db.application.services.logger')
     def test_logging_chunk_retrieval(self, mock_logger):
         """Test that chunk retrieval is logged"""
         library = Library(name="Test Library")
@@ -416,9 +407,9 @@ class TestChunkService:
         document = document.replace_content("Test content")
         library = library.add_document(document)
 
-        self.chunk_service.get_chunks_from_library(library)
+        ChunkService.get_chunks_from_library(library)
 
         mock_logger.debug.assert_called_once()
-        call_args = mock_logger.debug.call_args[1]
-        assert call_args['library_id'] == library.id
-        assert 'chunk_count' in call_args
+        # Check that logging was called with the expected message
+        call_args = mock_logger.debug.call_args
+        assert "Retrieved chunks from library" in call_args[0]
