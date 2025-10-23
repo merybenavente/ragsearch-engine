@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from classes.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata
+from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata
 
 
 class DocumentService:
