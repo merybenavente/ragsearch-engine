@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from threading import RLock
 from ..domain.models import Library, LibraryID, Document, DocumentID, Chunk, ChunkID
-from ..domain.exceptions import LibraryNotFoundException, DocumentNotFoundException, ChunkNotFoundException
 
 
 class LibraryRepository(ABC):
