@@ -1,0 +1,15 @@
+# isolated pyproject.toml for data scraper
+
+[project]
+name = "lyrics-scraper"
+version = "0.1.0"
+description = "Scrape lyrics and save to CSV"
+authors = [
+    { name="Your Name", email="your@email.com" }
+]
+requires-python = ">=3.11"
+
+[project.dependencies]
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.3"
+pandas = "^2.2.2"
