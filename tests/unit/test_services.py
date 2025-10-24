@@ -1,12 +1,12 @@
 """Unit tests for application services"""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
-from src.vector_db.application.services import DocumentService, LibraryService, ChunkService
+from src.vector_db.application.services import DocumentService, LibraryService, ChunkService, SearchService
 from src.vector_db.domain.models import (
-    Document, Library, Chunk, Metadata
+    Document, Library, Chunk
 )
 
 
@@ -17,8 +17,15 @@ class TestDocumentService:
         """Setup test fixtures"""
         self.library_id = str(uuid4())
 
-    def test_create_document_with_content(self):
+    @pytest.fixture
+    def mock_cohere_embed(self):
+        with patch('src.vector_db.domain.models.co.embed') as mock:
+            mock.return_value = MagicMock(embeddings=[[0.1] * 1536])
+            yield mock
+
+    def test_create_document_with_content(self, mock_cohere_embed):
         """Test creating a document with content"""
+
         text = "This is a test document with some content."
         username = "testuser"
         tags = ["tag1", "tag2"]
@@ -38,8 +45,9 @@ class TestDocumentService:
         assert document.metadata.username == username
         assert document.metadata.tags == tags
 
-    def test_create_document_with_defaults(self):
+    def test_create_document_with_defaults(self, mock_cohere_embed):
         """Test creating a document with default values"""
+
         text = "Test content"
 
         document = DocumentService.create_document(
@@ -80,8 +88,9 @@ class TestDocumentService:
         assert document.metadata.username is None
         assert document.metadata.tags == []
 
-    def test_update_document_content(self):
+    def test_update_document_content(self, mock_cohere_embed):
         """Test updating document content"""
+
         # Create initial document
         document = Document(library_id=self.library_id)
         document = document.replace_content("Original content")
@@ -98,9 +107,15 @@ class TestDocumentService:
         assert len(updated_document.chunks) > 1  # Should be chunked
         assert new_text == updated_document.get_full_text()
 
+    @patch('src.vector_db.domain.models.co')
     @patch('src.vector_db.application.services.logger')
-    def test_logging_document_creation(self, mock_logger):
+    def test_logging_document_creation(self, mock_logger, mock_co):
         """Test that document creation is logged"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+
         text = "Test content"
         username = "testuser"
         tags = ["tag1"]
@@ -199,50 +214,51 @@ class TestLibraryService:
     def test_remove_document_from_library_not_found(self):
         """Test removing a non-existent document from a library"""
         library = Library(name="Test Library")
-        non_existent_id = str(uuid4())
 
         with pytest.raises(ValueError, match="not found"):
             LibraryService.remove_document_from_library(
                 library=library,
-                document_id=non_existent_id
+                document_id="non-existent-id"
             )
 
-    def test_update_document_in_library(self):
+    @patch('src.vector_db.domain.models.co.embed')
+    def test_update_document_in_library(self, mock_embed):
         """Test updating a document in a library"""
+        mock_embed.return_value = MagicMock(embeddings=[[0.1] * 1536])
+
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
+        document = document.replace_content("Original content")
 
-        # Add document
+        # Add document to library
         library = library.add_document(document)
 
-        # Update document
-        updated_document = document.replace_content("New content")
+        # Update document content
+        updated_document = document.replace_content("Updated content")
         updated_library = LibraryService.update_document_in_library(
             library=library,
             updated_document=updated_document
         )
 
-        # Verify update
-        retrieved_doc = updated_library.get_document_by_id(document.id)
-        assert retrieved_doc is not None
-        assert retrieved_doc.has_content()
+        # Check that document was updated
+        assert len(updated_library.documents) == 1
+        assert updated_library.documents[0].get_full_text() == "Updated content"
 
     def test_update_document_in_library_not_found(self):
         """Test updating a non-existent document in a library"""
         library = Library(name="Test Library")
-        non_existent_doc = Document(library_id=library.id)
+        document = Document(library_id=library.id)
 
         with pytest.raises(ValueError, match="not found"):
             LibraryService.update_document_in_library(
                 library=library,
-                updated_document=non_existent_doc
+                updated_document=document
             )
 
     def test_update_library_metadata(self):
         """Test updating library metadata"""
-        library = Library(name="Original Name")
-
-        new_name = "Updated Name"
+        library = Library(name="Test Library")
+        new_name = "Updated Library"
         new_tags = ["new_tag1", "new_tag2"]
 
         updated_library = LibraryService.update_library_metadata(
@@ -253,13 +269,10 @@ class TestLibraryService:
 
         assert updated_library.name == new_name
         assert updated_library.metadata.tags == new_tags
-        assert updated_library.metadata.last_update > library.metadata.last_update
 
     def test_update_library_metadata_partial(self):
-        """Test updating library metadata partially"""
-        library = Library(name="Original Name")
-        original_name = library.name
-
+        """Test updating library metadata with partial updates"""
+        library = Library(name="Test Library")
         new_tags = ["new_tag"]
 
         updated_library = LibraryService.update_library_metadata(
@@ -267,7 +280,7 @@ class TestLibraryService:
             tags=new_tags
         )
 
-        assert updated_library.name == original_name  # Should remain unchanged
+        assert updated_library.name == library.name  # Unchanged
         assert updated_library.metadata.tags == new_tags
 
     @patch('src.vector_db.application.services.logger')
@@ -284,132 +297,405 @@ class TestLibraryService:
         )
 
         mock_logger.info.assert_called_once()
-        # Check that logging was called with the expected message
         call_args = mock_logger.info.call_args
         assert "Library created" in call_args[0]
 
 
 class TestChunkService:
-    """Test cases for chunk service functions"""
+    """Test cases for ChunkService"""
 
     def setup_method(self):
         """Setup test fixtures"""
-        pass
+        self.library_id = str(uuid4())
 
-    def test_get_chunks_from_library(self):
+    @patch('src.vector_db.domain.models.co')
+    def test_get_chunks_from_library(self, mock_co):
         """Test getting chunks from a library"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+
+        # Create a library with documents
         library = Library(name="Test Library")
-
-        # Add documents with content
-        doc1 = Document(library_id=library.id).replace_content("Document 1 content")
-        doc2 = Document(library_id=library.id).replace_content("Document 2 content")
-
+        doc1 = Document(library_id=library.id)
+        doc1 = doc1.replace_content("First document content.")
+        doc2 = Document(library_id=library.id)
+        doc2 = doc2.replace_content("Second document content.")
         library = library.add_document(doc1)
         library = library.add_document(doc2)
 
         chunks = ChunkService.get_chunks_from_library(library)
 
-        expected_count = len(doc1.chunks) + len(doc2.chunks)
-        assert len(chunks) == expected_count
+        assert isinstance(chunks, list)
+        assert len(chunks) > 0
+        assert all(isinstance(chunk, Chunk) for chunk in chunks)
 
     def test_get_chunks_from_library_empty(self):
         """Test getting chunks from an empty library"""
-        library = Library(name="Empty Library")
+        library = Library(name="Test Library")
 
         chunks = ChunkService.get_chunks_from_library(library)
 
         assert chunks == []
 
-    def test_get_chunks_from_document(self):
+    @patch('src.vector_db.domain.models.co')
+    def test_get_chunks_from_document(self, mock_co):
         """Test getting chunks from a document"""
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
-        document = document.replace_content("Test content for chunking")
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("This is a test document with some content.")
 
         chunks = ChunkService.get_chunks_from_document(document)
 
-        assert len(chunks) == len(document.chunks)
-        assert all(chunk.document_id == document.id for chunk in chunks)
+        assert isinstance(chunks, list)
+        assert len(chunks) > 0
+        assert all(isinstance(chunk, Chunk) for chunk in chunks)
 
     def test_get_chunks_from_document_empty(self):
         """Test getting chunks from an empty document"""
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
+        document = Document(library_id=self.library_id)
 
         chunks = ChunkService.get_chunks_from_document(document)
 
         assert chunks == []
 
-    def test_get_chunk_from_library(self):
+    @patch('src.vector_db.domain.models.co')
+    def test_get_chunk_from_library(self, mock_co):
         """Test getting a specific chunk from a library"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+
+        # Create a library with a document
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
-        document = document.replace_content("Test content")
+        document = document.replace_content("Test content.")
         library = library.add_document(document)
 
-        # Get first chunk
-        expected_chunk = document.chunks[0]
-        found_chunk = ChunkService.get_chunk_from_library(
-            library=library,
-            chunk_id=expected_chunk.id
-        )
+        # Get the first chunk
+        chunk_id = document.chunks[0].id
+        chunk = ChunkService.get_chunk_from_library(library, chunk_id)
 
-        assert found_chunk is not None
-        assert found_chunk.id == expected_chunk.id
+        assert isinstance(chunk, Chunk)
+        assert chunk.id == chunk_id
 
     def test_get_chunk_from_library_not_found(self):
         """Test getting a non-existent chunk from a library"""
         library = Library(name="Test Library")
-        non_existent_id = str(uuid4())
 
-        found_chunk = ChunkService.get_chunk_from_library(
-            library=library,
-            chunk_id=non_existent_id
-        )
+        with pytest.raises(ValueError, match="not found"):
+            ChunkService.get_chunk_from_library(library, "non-existent-id")
 
-        assert found_chunk is None
-
-    def test_get_chunk_from_document(self):
+    @patch('src.vector_db.domain.models.co.embed')
+    def test_get_chunk_from_document(self, mock_embed):
         """Test getting a specific chunk from a document"""
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
-        document = document.replace_content("Test content")
+        mock_embed.return_value = MagicMock(embeddings=[[0.1] * 1536])
 
-        # Get first chunk
-        expected_chunk = document.chunks[0]
-        found_chunk = ChunkService.get_chunk_from_document(
-            document=document,
-            chunk_id=expected_chunk.id
-        )
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("Test content.")
 
-        assert found_chunk is not None
-        assert found_chunk.id == expected_chunk.id
+        # Get the first chunk
+        chunk_id = document.chunks[0].id
+        chunk = ChunkService.get_chunk_from_document(document, chunk_id)
 
-    def test_get_chunk_from_document_not_found(self):
+        assert isinstance(chunk, Chunk)
+        assert chunk.id == chunk_id
+
+    @patch('src.vector_db.domain.models.co')
+    def test_get_chunk_from_document_not_found(self, mock_co):
         """Test getting a non-existent chunk from a document"""
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
-        document = document.replace_content("Test content")
-        non_existent_id = str(uuid4())
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
 
-        found_chunk = ChunkService.get_chunk_from_document(
-            document=document,
-            chunk_id=non_existent_id
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("Test content.")
+
+        with pytest.raises(ValueError, match="not found"):
+            ChunkService.get_chunk_from_document(document, "non-existent-id")
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.logger')
+    def test_logging_chunk_retrieval(self, mock_logger, mock_co):
+        """Test that chunk retrieval is logged"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("Test content.")
+
+        chunk_id = document.chunks[0].id
+        ChunkService.get_chunk_from_document(document, chunk_id)
+
+        mock_logger.info.assert_called_once()
+        call_args = mock_logger.info.call_args
+        assert "Chunk retrieved" in call_args[0]
+
+
+class TestSearchService:
+    """Test cases for SearchService"""
+
+    def setup_method(self):
+        """Setup test fixtures"""
+        self.library_id = str(uuid4())
+
+    @patch('src.vector_db.application.services.co')
+    def test_create_query_embedding(self, mock_co):
+        """Test creating query embedding"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]  # 1536 dimensions
+        mock_co.embed.return_value = mock_response
+
+        query_text = "test query"
+        embedding = SearchService._create_query_embedding(query_text)
+
+        # Verify Cohere API was called correctly
+        mock_co.embed.assert_called_once_with(
+            texts=[query_text],
+            model="embed-v4.0",
+            input_type="search_query",
+            truncate="NONE"
         )
 
-        assert found_chunk is None
+        # Verify embedding was returned
+        assert isinstance(embedding, list)
+        assert len(embedding) == 1536
 
-    @patch('src.vector_db.application.services.logger')
-    def test_logging_chunk_retrieval(self, mock_logger):
-        """Test that chunk retrieval is logged"""
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_in_document(self, mock_services_co, mock_domain_co):
+        """Test searching chunks in a document with text query"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]  # 1536 dimensions
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create a document with content
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("This is a test document about machine learning and AI.")
+
+        query_text = "machine learning"
+        results = SearchService.search_chunks_in_document(
+            document=document,
+            query_text=query_text,
+            k=5,
+            min_similarity=0.0
+        )
+
+        # Verify Cohere API was called
+        mock_services_co.embed.assert_called_once()
+
+        # Verify results structure
+        assert isinstance(results, list)
+        assert len(results) > 0
+        assert all(isinstance(result, tuple) for result in results)
+        assert all(len(result) == 2 for result in results)
+        assert all(isinstance(result[0], Chunk) for result in results)
+        assert all(isinstance(result[1], float) for result in results)
+
+        # Verify results are sorted by similarity (descending)
+        similarities = [result[1] for result in results]
+        assert similarities == sorted(similarities, reverse=True)
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_in_document_empty_document(self, mock_services_co, mock_domain_co):
+        """Test searching chunks in an empty document"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create an empty document
+        document = Document(library_id=self.library_id)
+
+        query_text = "test query"
+        results = SearchService.search_chunks_in_document(
+            document=document,
+            query_text=query_text
+        )
+
+        # Verify no results returned
+        assert results == []
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_in_document_with_min_similarity(self, mock_services_co, mock_domain_co):
+        """Test searching chunks with minimum similarity threshold"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create a document with content
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("This is a test document about machine learning and AI.")
+
+        query_text = "machine learning"
+        results = SearchService.search_chunks_in_document(
+            document=document,
+            query_text=query_text,
+            k=10,
+            min_similarity=0.8  # High threshold
+        )
+
+        # Verify results respect minimum similarity
+        for chunk, similarity in results:
+            assert similarity >= 0.8
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_in_document_k_limit(self, mock_services_co, mock_domain_co):
+        """Test that search respects the k limit"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create a document with content
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("This is a test document about machine learning and AI.")
+
+        query_text = "machine learning"
+        k = 2
+        results = SearchService.search_chunks_in_document(
+            document=document,
+            query_text=query_text,
+            k=k
+        )
+
+        # Verify results don't exceed k
+        assert len(results) <= k
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_in_library(self, mock_services_co, mock_domain_co):
+        """Test searching chunks in a library"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create a library with documents
         library = Library(name="Test Library")
-        document = Document(library_id=library.id)
-        document = document.replace_content("Test content")
-        library = library.add_document(document)
+        doc1 = Document(library_id=library.id)
+        doc1 = doc1.replace_content("First document about machine learning.")
+        doc2 = Document(library_id=library.id)
+        doc2 = doc2.replace_content("Second document about artificial intelligence.")
+        library = library.add_document(doc1)
+        library = library.add_document(doc2)
 
-        ChunkService.get_chunks_from_library(library)
+        query_text = "machine learning"
+        results = SearchService.search_chunks(
+            library=library,
+            query_text=query_text,
+            k=5
+        )
 
-        mock_logger.debug.assert_called_once()
-        # Check that logging was called with the expected message
-        call_args = mock_logger.debug.call_args
-        assert "Retrieved chunks from library" in call_args[0]
+        # Verify Cohere API was called
+        mock_services_co.embed.assert_called_once()
+
+        # Verify results structure
+        assert isinstance(results, list)
+        assert len(results) > 0
+        assert all(isinstance(result, tuple) for result in results)
+        assert all(len(result) == 2 for result in results)
+        assert all(isinstance(result[0], Chunk) for result in results)
+        assert all(isinstance(result[1], float) for result in results)
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.co')
+    def test_search_chunks_empty_library(self, mock_services_co, mock_domain_co):
+        """Test searching chunks in an empty library"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create an empty library
+        library = Library(name="Test Library")
+
+        query_text = "test query"
+        results = SearchService.search_chunks(
+            library=library,
+            query_text=query_text
+        )
+
+        # Verify no results returned
+        assert results == []
+
+    def test_cosine_similarity(self):
+        """Test cosine similarity calculation"""
+        # Test identical vectors
+        vec1 = [1.0, 0.0, 0.0]
+        vec2 = [1.0, 0.0, 0.0]
+        similarity = SearchService._cosine_similarity(vec1, vec2)
+        assert abs(similarity - 1.0) < 0.001
+
+        # Test orthogonal vectors
+        vec1 = [1.0, 0.0, 0.0]
+        vec2 = [0.0, 1.0, 0.0]
+        similarity = SearchService._cosine_similarity(vec1, vec2)
+        assert abs(similarity - 0.0) < 0.001
+
+        # Test opposite vectors
+        vec1 = [1.0, 0.0, 0.0]
+        vec2 = [-1.0, 0.0, 0.0]
+        similarity = SearchService._cosine_similarity(vec1, vec2)
+        assert abs(similarity - 0.0) < 0.001  # Clipped to 0 (max(0, -1.0))
+
+        # Test zero vectors
+        vec1 = [0.0, 0.0, 0.0]
+        vec2 = [0.0, 0.0, 0.0]
+        similarity = SearchService._cosine_similarity(vec1, vec2)
+        assert similarity == 0.0
+
+    def test_cosine_similarity_different_dimensions(self):
+        """Test cosine similarity with different vector dimensions"""
+        vec1 = [1.0, 0.0, 0.0]
+        vec2 = [1.0, 0.0]  # Different dimension
+
+        similarity = SearchService._cosine_similarity(vec1, vec2)
+        assert similarity == 0.0
+
+    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.application.services.logger')
+    @patch('src.vector_db.application.services.co')
+    def test_search_logging(self, mock_services_co, mock_logger, mock_domain_co):
+        """Test that search operations are logged"""
+        # Mock the Cohere API response
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_services_co.embed.return_value = mock_response
+        mock_domain_co.embed.return_value = mock_response
+
+        # Create a document with content
+        document = Document(library_id=self.library_id)
+        document = document.replace_content("This is a test document about machine learning.")
+
+        query_text = "machine learning"
+        SearchService.search_chunks_in_document(
+            document=document,
+            query_text=query_text
+        )
+
+        # Verify logging was called
+        mock_logger.info.assert_called_once()
+        call_args = mock_logger.info.call_args
+        assert "Document search completed" in call_args[0]

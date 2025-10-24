@@ -1,6 +1,7 @@
 """Test basic API functionality and imports"""
 
 import pytest
+from unittest.mock import patch, MagicMock
 
 
 def test_basic_imports():
@@ -14,8 +15,14 @@ def test_basic_imports():
         pytest.fail(f"Import failed: {e}")
 
 
-def test_create_document_function():
+@patch('src.vector_db.domain.models.co')
+def test_create_document_function(mock_co):
     """Test the create_document service function"""
+    # Mock the Cohere API response
+    mock_response = MagicMock()
+    mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]  # 1536 dimensions (rounded)
+    mock_co.embed.return_value = mock_response
+
     from src.vector_db.application.services import DocumentService
 
     library_id = "lib_123"
@@ -57,8 +64,14 @@ def test_create_library_function():
     assert len(library.documents) == 0
 
 
-def test_integration_example():
+@patch('src.vector_db.domain.models.co')
+def test_integration_example(mock_co):
     """Test creating library and adding documents"""
+    # Mock the Cohere API response
+    mock_response = MagicMock()
+    mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]  # 1536 dimensions (rounded)
+    mock_co.embed.return_value = mock_response
+
     from src.vector_db.application.services import LibraryService, DocumentService
 
     # Create library

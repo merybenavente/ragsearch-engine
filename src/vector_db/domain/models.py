@@ -1,13 +1,19 @@
+import numpy as np
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from uuid import uuid4
-import random
+
+from ..infrastructure.cohere_client import co
 
 
 ChunkID = str
 DocumentID = str
 LibraryID = str
+
+# Embedding model constants
+EMBEDDING_MODEL = "embed-v4.0"
+EMBEDDING_DIMENSION = 1536
 
 
 class Metadata(BaseModel):
@@ -41,8 +47,31 @@ class Chunk(BaseModel):
             self.embedding = self._create_embedding(self.text)
 
     def _create_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text. TODO: Replace with actual embedding logic"""
-        return [random.random() for _ in range(768)]
+        """
+        Generate embedding for text.
+
+        WARNING: This method is not thread-safe due to shared Cohere client access.
+        The global 'co' client may experience race conditions when multiple threads
+        call this method simultaneously. Consider:
+        - Using a connection pool for the Cohere client
+        - Implementing per-thread clients
+        - Adding synchronization locks around API calls
+        - Moving to async implementation with semaphores
+        """
+        if co is None:
+            raise RuntimeError("Cohere client not available. Please set COHERE_API_KEY environment variable.")
+
+        resp = co.embed(
+            texts=[text],
+            model=EMBEDDING_MODEL,
+            input_type="search_document",
+            truncate="NONE"
+        )
+
+        embeddings = np.array(resp.embeddings)
+        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+
+        return embeddings[0].tolist()
 
 
 class Document(BaseModel):

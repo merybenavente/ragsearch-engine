@@ -103,7 +103,7 @@ class InMemoryLibraryRepository(LibraryRepository, LoggerMixin):
                 return True
             else:
                 self.logger.warning(
-                    "Attempted to delete non-existent library",
+                    "Library not found",
                     library_id=library_id
                 )
                 return False
