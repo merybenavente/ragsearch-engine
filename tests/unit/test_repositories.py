@@ -349,13 +349,8 @@ class TestRepositoryBasedChunkRepository:
         self.library_repository = InMemoryLibraryRepository()
         self.chunk_repository = RepositoryBasedChunkRepository(self.library_repository)
 
-    @patch('src.vector_db.infrastructure.cohere_client.co')
-    def test_find_by_id_existing_chunk(self, mock_co):
+    def test_find_by_id_existing_chunk(self):
         """Test finding an existing chunk by ID"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]
-        mock_co.embed.return_value = mock_response
 
         library = Library(name="Test Library")
         self.library_repository.save(library)
@@ -391,13 +386,8 @@ class TestRepositoryBasedChunkRepository:
 
         assert found_chunk is None
 
-    @patch('src.vector_db.infrastructure.cohere_client.co')
-    def test_find_all_in_library_existing(self, mock_co):
+    def test_find_all_in_library_existing(self):
         """Test finding all chunks in an existing library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 153]
-        mock_co.embed.return_value = mock_response
 
         library = Library(name="Test Library")
         self.library_repository.save(library)
@@ -436,13 +426,8 @@ class TestRepositoryBasedChunkRepository:
 
         assert chunks == []
 
-    @patch('src.vector_db.infrastructure.cohere_client.co')
-    def test_find_all_in_document_existing(self, mock_co):
+    def test_find_all_in_document_existing(self):
         """Test finding all chunks in an existing document"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 153]
-        mock_co.embed.return_value = mock_response
 
         library = Library(name="Test Library")
         self.library_repository.save(library)

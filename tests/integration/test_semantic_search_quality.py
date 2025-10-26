@@ -65,48 +65,55 @@ class TestSemanticSearchQuality:
         assert scores["service animal"] > scores["cooking recipes"], \
             "Related concept should score higher than unrelated content"
 
+    @pytest.mark.timeout(60)  # Add timeout to prevent hanging
     def test_semantic_similarity_synonyms(self):
         """Test that semantic search handles synonyms correctly"""
-        document = self.document_service.create_document(
-            library_id=self.library_id,
-            text="The automobile industry has revolutionized transportation. Cars have become "
-            "essential for daily commuting and long-distance travel. The automotive sector "
-            "employs millions of people worldwide and drives economic growth."
-        )
-
-        # Test synonym pairs
-        synonym_pairs = [
-            ("car", "automobile"),
-            ("vehicle", "automotive"),
-            ("transport", "transportation"),
-        ]
-
-        for query1, query2 in synonym_pairs:
-            results1 = self.search_service.search_chunks_in_document(
-                document=document,
-                query_text=query1,
-                k=3,
-                min_similarity=0.0
+        try:
+            document = self.document_service.create_document(
+                library_id=self.library_id,
+                text="The automobile industry has revolutionized transportation. Cars have become "
+                "essential for daily commuting and long-distance travel. The automotive sector "
+                "employs millions of people worldwide and drives economic growth."
             )
 
-            results2 = self.search_service.search_chunks_in_document(
-                document=document,
-                query_text=query2,
-                k=3,
-                min_similarity=0.0
-            )
+            # Test synonym pairs
+            synonym_pairs = [
+                ("car", "automobile"),
+                ("vehicle", "automotive"),
+                ("transport", "transportation"),
+            ]
 
-            # Both queries should return results
-            assert len(results1) > 0, f"No results for query: {query1}"
-            assert len(results2) > 0, f"No results for query: {query2}"
+            for query1, query2 in synonym_pairs:
+                results1 = self.search_service.search_chunks_in_document(
+                    document=document,
+                    query_text=query1,
+                    k=3,
+                    min_similarity=0.0
+                )
 
-            # Similarities should be comparable (within reasonable range)
-            similarity1 = results1[0][1]
-            similarity2 = results2[0][1]
-            similarity_diff = abs(similarity1 - similarity2)
+                results2 = self.search_service.search_chunks_in_document(
+                    document=document,
+                    query_text=query2,
+                    k=3,
+                    min_similarity=0.0
+                )
 
-            assert similarity_diff < 0.3, \
-                f"Synonyms '{query1}' and '{query2}' have very different similarities: {similarity1} vs {similarity2}"
+                # Both queries should return results
+                assert len(results1) > 0, f"No results for query: {query1}"
+                assert len(results2) > 0, f"No results for query: {query2}"
+
+                # Similarities should be comparable (within reasonable range)
+                similarity1 = results1[0][1]
+                similarity2 = results2[0][1]
+                similarity_diff = abs(similarity1 - similarity2)
+
+                assert similarity_diff < 0.3, \
+                    f"Synonyms '{query1}' and '{query2}' have very different similarities: {similarity1} vs {similarity2}"
+        except RuntimeError as e:
+            if "Failed to create embedding" in str(e) and "timeout" in str(e).lower():
+                pytest.skip(f"Skipping test due to Cohere API timeout: {e}")
+            else:
+                raise
 
     def test_semantic_similarity_context(self):
         """Test that semantic search understands context"""

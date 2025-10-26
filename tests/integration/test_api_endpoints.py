@@ -4,10 +4,22 @@ import pytest
 from fastapi.testclient import TestClient
 from fastapi import status
 from uuid import uuid4
+from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
 
 client = TestClient(app)
+
+
+# Mock Cohere embedding service for integration tests
+@pytest.fixture(autouse=True)
+def mock_cohere_embedding_service():
+    """Mock the Cohere embedding service for integration tests"""
+    with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]  # Mock embedding
+        mock_co.embed.return_value = mock_response
+        yield mock_co
 
 
 class TestHealthEndpoints:

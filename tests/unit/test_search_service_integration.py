@@ -210,7 +210,7 @@ class TestSearchService:
     def test_cosine_similarity(self, vec1, vec2, expected, tolerance, description):
         """Test cosine similarity calculation for various vector scenarios"""
         similarity = self.search_service._cosine_similarity(vec1, vec2)
-        
+
         if tolerance > 0:
             assert abs(similarity - expected) < tolerance, f"Failed for {description}"
         else:
@@ -238,10 +238,10 @@ class TestSearchService:
 
         # Verify logging was called for search operation
         # We expect multiple log calls (document creation + search), so check for the search log specifically
-        search_calls = [call for call in mock_logger.info.call_args_list 
+        search_calls = [call for call in mock_logger.info.call_args_list
                        if "Document search completed" in str(call)]
         assert len(search_calls) == 1
-        
+
         # Verify log content is about search completion
         call_args = search_calls[0]
         log_message = call_args[0][0]  # First positional argument
@@ -250,16 +250,27 @@ class TestSearchService:
     @patch('src.vector_db.application.services.logger')
     def test_logging_levels(self, mock_logger):
         """Test that appropriate log levels are used for different scenarios"""
-        # Test info level for normal operations
-        document = Document(library_id=self.library_id)
-        
-        try:
-            self.search_service.search_chunks_in_document(document, "test query")
-        except:
-            pass  # We expect this to fail without proper setup
-            
-        # Should use info level for normal search operations
-        assert mock_logger.info.called
-        
-        # Test that logger was used (verifies logging integration)
-        assert mock_logger.call_count > 0
+        # Mock the embedding service directly to avoid numpy issues
+        with patch.object(self.search_service._embedding_service, 'create_embedding') as mock_create_embedding:
+            # Return a simple normalized embedding
+            mock_create_embedding.return_value = [0.1] * 1536
+
+            # Test info level for normal operations
+            # Create a document with some chunks by creating it with content
+            document_id = str(uuid4())
+            chunk = Chunk(
+                id=str(uuid4()),
+                document_id=document_id,
+                text="Test chunk content",
+                embedding=[0.1] * 1536  # Simple normalized embedding
+            )
+            document = Document(id=document_id, library_id=self.library_id, chunks=[chunk])
+
+            _ = self.search_service.search_chunks_in_document(document, "test query")
+
+            # Should use info level for normal search operations
+            assert mock_logger.info.called
+
+            # Test that the specific log message was called
+            info_calls = mock_logger.info.call_args_list
+            assert any("Document search completed" in str(call) for call in info_calls)
