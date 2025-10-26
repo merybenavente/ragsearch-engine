@@ -153,3 +153,8 @@ class TestChunkService:
         chunk_retrieval_calls = [call for call in mock_logger.info.call_args_list 
                                if "Chunk retrieved" in str(call)]
         assert len(chunk_retrieval_calls) == 1
+        
+        # Verify log content is about chunk retrieval  
+        call_args = chunk_retrieval_calls[0]
+        log_message = call_args[0][0]  # First positional argument
+        assert "Chunk retrieved" in log_message
