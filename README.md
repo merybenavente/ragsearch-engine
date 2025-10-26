@@ -134,14 +134,19 @@ curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/" \
 
 ### Running Tests
 
-Run the full test suite:
+Run the recommended test suite (excludes slow semantic quality tests):
+```bash
+poetry run pytest -m "not semantic_quality"
+```
+
+Run the full test suite (including slow semantic quality tests, and which needs a `COHERE_API_KEY`):
 ```bash
 poetry run pytest
 ```
 
 Run with coverage:
 ```bash
-poetry run pytest --cov=src/vector_db --cov-report=html
+poetry run pytest --cov=src/vector_db --cov-report=html -m "not semantic_quality"
 ```
 
 Run specific test categories:
@@ -152,6 +157,9 @@ poetry run pytest tests/unit/
 # Integration tests only
 poetry run pytest tests/integration/
 
+# Semantic quality tests (requires COHERE_API_KEY)
+poetry run pytest -m semantic_quality
+
 # Specific test file
 poetry run pytest tests/unit/test_domain_models.py
 ```
@@ -160,11 +168,18 @@ poetry run pytest tests/unit/test_domain_models.py
 
 - **Unit Tests** (`tests/unit/`):
   - `test_domain_models.py` - Domain model functionality
-  - `test_services.py` - Application service logic
+  - `test_document_service.py` - Document service operations
+  - `test_library_service.py` - Library service operations
+  - `test_chunk_service.py` - Chunk service operations
+  - `test_search_service_integration.py` - Search service integration
   - `test_repositories.py` - Repository operations and thread safety
+  - `test_search_service.py` - Search service unit tests
+  - `test_api_functions.py` - API function tests
 
 - **Integration Tests** (`tests/integration/`):
   - `test_api_endpoints.py` - Full API endpoint testing
+  - `test_main.py` - Main application testing
+  - `test_semantic_search_quality.py` - Semantic search quality (slow, requires API key)
 
 ### Code Quality
 
