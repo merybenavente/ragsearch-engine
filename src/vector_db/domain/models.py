@@ -4,7 +4,6 @@ from typing import List, Optional
 from datetime import datetime
 from uuid import uuid4
 
-from ..infrastructure.cohere_client import co
 
 
 ChunkID = str
@@ -42,36 +41,9 @@ class Chunk(BaseModel):
 
     def __init__(self, **data):
         super().__init__(**data)
-        # Generate embedding after initialization if not provided
-        if not self.embedding and self.text:
-            self.embedding = self._create_embedding(self.text)
+        # Embedding should be provided explicitly during chunk creation
+        # If not provided, it will remain empty (to be filled by application layer)
 
-    def _create_embedding(self, text: str) -> List[float]:
-        """
-        Generate embedding for text.
-
-        WARNING: This method is not thread-safe due to shared Cohere client access.
-        The global 'co' client may experience race conditions when multiple threads
-        call this method simultaneously. Consider:
-        - Using a connection pool for the Cohere client
-        - Implementing per-thread clients
-        - Adding synchronization locks around API calls
-        - Moving to async implementation with semaphores
-        """
-        if co is None:
-            raise RuntimeError("Cohere client not available. Please set COHERE_API_KEY environment variable.")
-
-        resp = co.embed(
-            texts=[text],
-            model=EMBEDDING_MODEL,
-            input_type="search_document",
-            truncate="NONE"
-        )
-
-        embeddings = np.array(resp.embeddings)
-        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        return embeddings[0].tolist()
 
 
 class Document(BaseModel):
@@ -105,55 +77,6 @@ class Document(BaseModel):
                 return chunk
         return None
 
-    def replace_content(self, text: str, chunk_size: int = 500) -> 'Document':
-        """
-        Replace entire document content and regenerate all chunks.
-
-        This is the ONLY way to modify document content, ensuring:
-        - Data consistency between text and chunks
-        - Atomic updates (all or nothing)
-        - Predictable chunking behavior
-        """
-        if not text:
-            # Empty content = no chunks
-            return self.model_copy(update={
-                'chunks': [],
-                'metadata': self.metadata.update_timestamp()
-            })
-
-        # Generate new chunks from text
-        new_chunks = self._create_chunks_from_text(text, chunk_size)
-
-        return self.model_copy(update={
-            'chunks': new_chunks,
-            'metadata': self.metadata.update_timestamp()
-        })
-
-    def _create_chunks_from_text(self, text: str, chunk_size: int = 500) -> List[Chunk]:
-        """
-        Split text into chunks and create Chunk objects.
-
-        Current implementation uses simple character-based chunking.
-
-        TODO: Implement smart chunking strategies:
-        - Paragraph-based chunking (split on \n\n)
-        - Sentence-based chunking (using NLP sentence boundaries)
-        - Semantic chunking (split on topic boundaries)
-        - Sliding window chunking (with overlap)
-        - Custom delimiter chunking (user-defined separators)
-        """
-        chunks = []
-
-        for i in range(0, len(text), chunk_size):
-            chunk_text = text[i:i + chunk_size]
-            if chunk_text:  # Only create non-empty chunks
-                chunk = Chunk(
-                    document_id=self.id,
-                    text=chunk_text
-                )
-                chunks.append(chunk)
-
-        return chunks
 
 
 class Library(BaseModel):

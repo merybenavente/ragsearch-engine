@@ -4,16 +4,19 @@ from datetime import datetime
 import numpy as np
 
 from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata, EMBEDDING_MODEL
+from ..domain.interfaces import EmbeddingService
 from ..infrastructure.logging import get_logger
-from ..infrastructure.cohere_client import co
 
 logger = get_logger(__name__)
 
 class DocumentService:
     """Service layer for document operations"""
+    
+    def __init__(self, embedding_service: EmbeddingService):
+        self._embedding_service = embedding_service
 
-    @staticmethod
     def create_document(
+        self,
         library_id: LibraryID,
         text: str,
         username: Optional[str] = None,
@@ -26,13 +29,13 @@ class DocumentService:
 
         metadata = Metadata(username=username, tags=tags)
         document = Document(library_id=library_id, metadata=metadata)
-        result = document.replace_content(text, chunk_size)
+        result = self._replace_document_content(document, text, chunk_size)
 
         logger.info("Document created", doc_id=result.id, chunks=len(result.chunks))
         return result
 
-    @staticmethod
     def create_empty_document(
+        self,
         library_id: LibraryID,
         username: Optional[str] = None,
         tags: Optional[List[str]] = None
@@ -47,25 +50,73 @@ class DocumentService:
         logger.info("Empty document created", doc_id=document.id)
         return document
 
-    @staticmethod
     def update_document_content(
+        self,
         document: Document,
         new_text: str,
         chunk_size: int = 500
     ) -> Document:
         """Update document content (replaces all existing content and chunks)"""
         old_chunk_count = len(document.chunks)
-        result = document.replace_content(new_text, chunk_size)
+        result = self._replace_document_content(document, new_text, chunk_size)
 
         logger.info("Document updated", doc_id=document.id, chunks=f"{old_chunk_count}→{len(result.chunks)}")
         return result
+
+    def _replace_document_content(self, document: Document, text: str, chunk_size: int = 500) -> Document:
+        """
+        Replace document content with proper chunking and embedding generation.
+        
+        This method handles:
+        1. Text chunking 
+        2. Embedding generation for each chunk
+        3. Document update with new chunks
+        """
+        if not text:
+            # Empty content = no chunks
+            return document.model_copy(update={
+                'chunks': [],
+                'metadata': document.metadata.update_timestamp()
+            })
+
+        # Generate chunks with embeddings
+        chunks = self._create_chunks_from_text(document.id, text, chunk_size)
+        
+        return document.model_copy(update={
+            'chunks': chunks,
+            'metadata': document.metadata.update_timestamp()
+        })
+
+    def _create_chunks_from_text(self, document_id: DocumentID, text: str, chunk_size: int = 500) -> List[Chunk]:
+        """
+        Split text into chunks and create Chunk objects with embeddings.
+        
+        This method handles both chunking and embedding generation to ensure
+        chunks are never created without embeddings.
+        """
+        chunks = []
+
+        for i in range(0, len(text), chunk_size):
+            chunk_text = text[i:i + chunk_size]
+            if chunk_text:  # Only create non-empty chunks
+                # Generate embedding for this chunk
+                embedding = self._embedding_service.create_embedding(chunk_text)
+                
+                chunk = Chunk(
+                    document_id=document_id,
+                    text=chunk_text,
+                    embedding=embedding
+                )
+                chunks.append(chunk)
+
+        return chunks
 
 
 class LibraryService:
     """Service layer for library operations"""
 
-    @staticmethod
     def create_library(
+        self,
         name: str,
         username: Optional[str] = None,
         tags: Optional[List[str]] = None
@@ -80,8 +131,7 @@ class LibraryService:
         logger.info("Library created", lib_id=library.id, name=name)
         return library
 
-    @staticmethod
-    def add_document_to_library(library: Library, document: Document) -> Library:
+    def add_document_to_library(self, library: Library, document: Document) -> Library:
         """Add a document to a library"""
         if library.document_exists(document.id):
             logger.warning("Duplicate document", doc_id=document.id)
@@ -91,8 +141,7 @@ class LibraryService:
         logger.info("Document added", doc_id=document.id, total_docs=len(result.documents))
         return result
 
-    @staticmethod
-    def remove_document_from_library(library: Library, document_id: DocumentID) -> Library:
+    def remove_document_from_library(self, library: Library, document_id: DocumentID) -> Library:
         """Remove a document from a library"""
         if not library.document_exists(document_id):
             raise ValueError(f"Document {document_id} not found in library")
@@ -101,8 +150,7 @@ class LibraryService:
         logger.info("Document removed", doc_id=document_id, total_docs=len(result.documents))
         return result
 
-    @staticmethod
-    def update_document_in_library(library: Library, updated_document: Document) -> Library:
+    def update_document_in_library(self, library: Library, updated_document: Document) -> Library:
         """Update a document within a library"""
         if not library.document_exists(updated_document.id):
             raise ValueError(f"Document {updated_document.id} not found in library")
@@ -111,8 +159,8 @@ class LibraryService:
         logger.info("Document updated in library", doc_id=updated_document.id)
         return result
 
-    @staticmethod
     def update_library_metadata(
+        self,
         library: Library,
         name: Optional[str] = None,
         tags: Optional[List[str]] = None
@@ -121,12 +169,12 @@ class LibraryService:
         # Early return if no changes
         if name is None and tags is None:
             return library
-        
+
         updates = {}
 
         if name is not None:
             updates['name'] = name
-        
+
         # Actualizar los tags y el timestamp correctamente
         new_metadata = library.metadata
         if tags is not None:
@@ -149,22 +197,19 @@ class ChunkService:
     This service provides read-only access to chunks for search and retrieval.
     """
 
-    @staticmethod
-    def get_chunks_from_library(library: Library) -> List[Chunk]:
+    def get_chunks_from_library(self, library: Library) -> List[Chunk]:
         """Get all chunks from a library (read-only)"""
         chunks = library.get_all_chunks()
         logger.debug("Retrieved chunks from library", lib_id=library.id, count=len(chunks))
         return chunks
 
-    @staticmethod
-    def get_chunks_from_document(document: Document) -> List[Chunk]:
+    def get_chunks_from_document(self, document: Document) -> List[Chunk]:
         """Get all chunks from a document (read-only)"""
         chunks = document.chunks
         logger.debug("Retrieved chunks from document", doc_id=document.id, count=len(chunks))
         return chunks
 
-    @staticmethod
-    def get_chunk_from_library(library: Library, chunk_id: ChunkID) -> Chunk:
+    def get_chunk_from_library(self, library: Library, chunk_id: ChunkID) -> Chunk:
         """Find a specific chunk in a library (read-only)"""
         for document in library.documents:
             chunk = document.get_chunk_by_id(chunk_id)
@@ -175,8 +220,7 @@ class ChunkService:
         logger.debug("Chunk not found", chunk_id=chunk_id, lib_id=library.id)
         raise ValueError(f"Chunk with id {chunk_id} not found in library")
 
-    @staticmethod
-    def get_chunk_from_document(document: Document, chunk_id: ChunkID) -> Chunk:
+    def get_chunk_from_document(self, document: Document, chunk_id: ChunkID) -> Chunk:
         """Find a specific chunk in a document (read-only)"""
         chunk = document.get_chunk_by_id(chunk_id)
         logger.info("Chunk retrieved", doc_id=document.id, chunk_id=chunk_id, found=chunk is not None)
@@ -188,30 +232,20 @@ class ChunkService:
 class SearchService:
     """
     Service layer for vector similarity search operations.
-    
+
     This service implements k-nearest neighbor search using cosine similarity
     to find the most relevant chunks for a given query embedding.
     """
     
-    @staticmethod
-    def _create_query_embedding(text: str) -> List[float]:
-        """Convert query text to embedding using same model as chunks"""
-        if co is None:
-            raise RuntimeError("Cohere client not available. Please set COHERE_API_KEY environment variable.")
-        
-        resp = co.embed(
-            texts=[text],
-            model=EMBEDDING_MODEL,
-            input_type="search_query",
-            truncate="NONE"
-        )
-        embeddings = np.array(resp.embeddings)
-        # Normalize the embedding
-        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-        return embeddings[0].tolist()
+    def __init__(self, embedding_service: EmbeddingService):
+        self._embedding_service = embedding_service
 
-    @staticmethod
+    def _create_query_embedding(self, text: str) -> List[float]:
+        """Convert query text to embedding using same model as chunks"""
+        return self._embedding_service.create_embedding(text, input_type="search_query")
+
     def _perform_search(
+        self,
         chunks: List[Chunk],
         query_text: str,
         k: int,
@@ -220,18 +254,18 @@ class SearchService:
     ) -> List[Tuple[Chunk, float]]:
         """
         Common search logic for both library and document searches.
-        
+
         Args:
             chunks: List of chunks to search in
             query_text: Query text to search for
             k: Number of results to return
             min_similarity: Minimum similarity threshold
             context: Dictionary with context info for logging (e.g., lib_id, doc_id)
-            
+
         Returns:
             List of (chunk, similarity_score) tuples, sorted by similarity descending
         """
-        query_embedding = SearchService._create_query_embedding(query_text)
+        query_embedding = self._create_query_embedding(query_text)
 
         # Calculate similarities for all chunks
         similarities = []
@@ -239,14 +273,14 @@ class SearchService:
             if not chunk.embedding:
                 logger.warning("Chunk has no embedding", chunk_id=chunk.id)
                 continue
-                
-            similarity = SearchService._cosine_similarity(query_embedding, chunk.embedding)
+
+            similarity = self._cosine_similarity(query_embedding, chunk.embedding)
             if similarity >= min_similarity:
                 similarities.append((chunk, similarity))
 
         # Sort by similarity (descending) and take top k
         similarities.sort(key=lambda x: x[1], reverse=True)
-        
+
         # Handle case where we have fewer results than requested k
         if len(similarities) < k:
             logger.warning(
@@ -255,7 +289,7 @@ class SearchService:
                 available_results=len(similarities),
                 **context
             )
-        
+
         results = similarities[:k]
 
         logger.info(
@@ -269,8 +303,8 @@ class SearchService:
 
         return results
 
-    @staticmethod
     def search_chunks(
+        self,
         library: Library,
         query_text: str,
         k: int = 10,
@@ -278,13 +312,13 @@ class SearchService:
     ) -> List[Tuple[Chunk, float]]:
         """
         Search for the k most similar chunks in a library.
-        
+
         Args:
             library: Library to search in
             query_text: Query text to search for
             k: Number of results to return
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
-            
+
         Returns:
             List of (chunk, similarity_score) tuples, sorted by similarity descending
         """
@@ -293,7 +327,7 @@ class SearchService:
             logger.debug("No chunks found in library", lib_id=library.id)
             return []
 
-        return SearchService._perform_search(
+        return self._perform_search(
             chunks=chunks,
             query_text=query_text,
             k=k,
@@ -301,8 +335,8 @@ class SearchService:
             context={"lib_id": library.id}
         )
 
-    @staticmethod
     def search_chunks_in_document(
+        self,
         document: Document,
         query_text: str,
         k: int = 10,
@@ -310,13 +344,13 @@ class SearchService:
     ) -> List[Tuple[Chunk, float]]:
         """
         Search for the k most similar chunks in a specific document.
-        
+
         Args:
             document: Document to search in
             query_text: Query text to search for
             k: Number of results to return
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
-            
+
         Returns:
             List of (chunk, similarity_score) tuples, sorted by similarity descending
         """
@@ -324,7 +358,7 @@ class SearchService:
             logger.debug("Document has no chunks", doc_id=document.id)
             return []
 
-        return SearchService._perform_search(
+        return self._perform_search(
             chunks=document.chunks,
             query_text=query_text,
             k=k,
@@ -332,15 +366,14 @@ class SearchService:
             context={"doc_id": document.id}
         )
 
-    @staticmethod
-    def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """
         Calculate cosine similarity between two vectors.
-        
+
         Args:
             vec1: First vector
             vec2: Second vector
-            
+
         Returns:
             Cosine similarity score between 0 and 1
         """
@@ -362,6 +395,6 @@ class SearchService:
             return 0.0
 
         similarity = dot_product / (norm_v1 * norm_v2)
-        
+
         # Ensure result is between 0 and 1
         return max(0.0, min(1.0, similarity))

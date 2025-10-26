@@ -15,15 +15,17 @@ A FastAPI-based REST API for vector database operations with document indexing a
 
 ## Architecture
 
-The project follows Domain-Driven Design (DDD) principles with clean architecture:
+The project follows Domain-Driven Design (DDD) principles with clean architecture and dependency injection:
 
 ```
 src/vector_db/
 ├── api/           # API layer (FastAPI routers, schemas, dependencies)
 ├── application/   # Application services (business logic)
-├── domain/        # Domain models and exceptions
-└── infrastructure/ # Infrastructure (repositories, logging)
+├── domain/        # Domain models, interfaces, and exceptions
+└── infrastructure/ # Infrastructure (repositories, logging, external services)
 ```
+
+The architecture implements a comprehensive dependency injection pattern where all services are provided through abstract interfaces, enabling easy testing and flexible embedding provider swapping. The `EmbeddingService` interface abstracts vector generation from the business logic, while the application layer orchestrates document chunking and embedding generation to ensure chunks are always created with their corresponding vector embeddings. This design separates concerns cleanly: domain models focus on business rules, application services handle use cases and orchestration, infrastructure services manage external dependencies (like the Cohere API), and the API layer provides a consistent RESTful interface with proper error handling and dependency injection throughout.
 
 ### Key Components
 
@@ -99,6 +101,10 @@ Once running, visit:
 - `GET /api/v1/libraries/{library_id}/chunks/` - List all chunks in library
 - `GET /api/v1/libraries/{library_id}/chunks/{chunk_id}` - Get specific chunk
 - `GET /api/v1/libraries/{library_id}/chunks/documents/{document_id}` - Get document chunks
+
+#### Search
+<!-- TODO -->
+
 
 ## Example Usage
 
