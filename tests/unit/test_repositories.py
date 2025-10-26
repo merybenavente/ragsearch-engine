@@ -11,8 +11,9 @@ from src.vector_db.infrastructure.repository import (
     RepositoryBasedChunkRepository
 )
 from src.vector_db.domain.models import (
-    Library, Document
+    Library, Document, Chunk
 )
+from src.vector_db.api.dependencies import get_document_service
 
 
 class TestInMemoryLibraryRepository:
@@ -341,19 +342,19 @@ class TestRepositoryBasedChunkRepository:
         self.library_repository = InMemoryLibraryRepository()
         self.chunk_repository = RepositoryBasedChunkRepository(self.library_repository)
 
-    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.infrastructure.cohere_client.co')
     def test_find_by_id_existing_chunk(self, mock_co):
         """Test finding an existing chunk by ID"""
         # Mock the Cohere API response
         mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 153]
+        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]
         mock_co.embed.return_value = mock_response
 
         library = Library(name="Test Library")
         self.library_repository.save(library)
 
-        document = Document(library_id=library.id)
-        document = document.replace_content("Test content")
+        document_service = get_document_service()
+        document = document_service.create_document(library.id, "Test content")
         library = library.add_document(document)
         self.library_repository.save(library)
 
@@ -383,7 +384,7 @@ class TestRepositoryBasedChunkRepository:
 
         assert found_chunk is None
 
-    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.infrastructure.cohere_client.co')
     def test_find_all_in_library_existing(self, mock_co):
         """Test finding all chunks in an existing library"""
         # Mock the Cohere API response
@@ -396,9 +397,10 @@ class TestRepositoryBasedChunkRepository:
 
         # Add documents with content
         doc1 = Document(library_id=library.id)
-        doc1 = doc1.replace_content("First document content")
+        document_service = get_document_service()
+        doc1 = document_service.update_document_content(doc1, "First document content")
         doc2 = Document(library_id=library.id)
-        doc2 = doc2.replace_content("Second document content")
+        doc2 = document_service.update_document_content(doc2, "Second document content")
 
         library = library.add_document(doc1)
         library = library.add_document(doc2)
@@ -427,7 +429,7 @@ class TestRepositoryBasedChunkRepository:
 
         assert chunks == []
 
-    @patch('src.vector_db.domain.models.co')
+    @patch('src.vector_db.infrastructure.cohere_client.co')
     def test_find_all_in_document_existing(self, mock_co):
         """Test finding all chunks in an existing document"""
         # Mock the Cohere API response
@@ -438,8 +440,8 @@ class TestRepositoryBasedChunkRepository:
         library = Library(name="Test Library")
         self.library_repository.save(library)
 
-        document = Document(library_id=library.id)
-        document = document.replace_content("Test content that will be chunked")
+        document_service = get_document_service()
+        document = document_service.create_document(library.id, "Test content that will be chunked")
         library = library.add_document(document)
         self.library_repository.save(library)
 

@@ -1,14 +1,15 @@
 """Unit tests for domain models"""
 
 import pytest
-from unittest.mock import patch, MagicMock
 from datetime import datetime
 from uuid import uuid4
+from unittest.mock import patch, MagicMock
 
 from src.vector_db.domain.models import (
     Chunk, Document, Library, Metadata,
-    ChunkID, DocumentID, LibraryID
+    ChunkID, DocumentID, LibraryID, EMBEDDING_DIMENSION
 )
+from src.vector_db.api.dependencies import get_document_service
 
 
 class TestMetadata:
@@ -51,14 +52,8 @@ class TestMetadata:
 class TestChunk:
     """Test cases for Chunk model"""
 
-    @patch('src.vector_db.domain.models.co')
-    def test_chunk_creation_with_text(self, mock_co):
+    def test_chunk_creation_with_text(self):
         """Test chunk creation with text content"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 384]  # 1536 dimensions
-        mock_co.embed.return_value = mock_response
-
         document_id = str(uuid4())
         text = "This is a test chunk"
         
@@ -67,7 +62,7 @@ class TestChunk:
         assert chunk.document_id == document_id
         assert chunk.text == text
         assert isinstance(chunk.id, str)
-        assert len(chunk.embedding) == 1536  # Default embedding size
+        assert chunk.embedding == []  # Default empty embedding
         assert isinstance(chunk.metadata, Metadata)
 
     def test_chunk_creation_with_embedding(self):
@@ -87,14 +82,8 @@ class TestChunk:
         with pytest.raises(ValueError):
             Chunk(document_id=document_id, text="")
 
-    @patch('src.vector_db.domain.models.co')
-    def test_chunk_immutability(self, mock_co):
+    def test_chunk_immutability(self):
         """Test that chunks are immutable (Pydantic models are frozen-like)"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         document_id = str(uuid4())
         text = "Test text"
         
@@ -125,123 +114,65 @@ class TestDocument:
         assert document.chunks == []
         assert isinstance(document.metadata, Metadata)
 
-    @patch('src.vector_db.domain.models.co')
-    def test_document_has_content(self, mock_co):
+    def test_document_has_content(self):
         """Test document content detection"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library_id = str(uuid4())
         
         # Empty document
         document = Document(library_id=library_id)
         assert not document.has_content()
         
-        # Document with content
-        document_with_content = document.replace_content("Some content")
+        # Document with content (manually add a chunk)
+        chunk = Chunk(document_id=document.id, text="Some content")
+        document_with_content = document.model_copy(update={'chunks': [chunk]})
         assert document_with_content.has_content()
 
-    @patch('src.vector_db.domain.models.co')
-    def test_document_replace_content(self, mock_co):
-        """Test document content replacement"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
+    def test_document_get_full_text(self):
+        """Test getting full text from document chunks"""
         library_id = str(uuid4())
         document = Document(library_id=library_id)
         
-        text = "This is a test document with some content that should be chunked."
-        updated_doc = document.replace_content(text, chunk_size=20)
+        # Add some chunks manually
+        chunk1 = Chunk(document_id=document.id, text="First chunk. ")
+        chunk2 = Chunk(document_id=document.id, text="Second chunk.")
+        document_with_chunks = document.model_copy(update={'chunks': [chunk1, chunk2]})
         
-        assert updated_doc.has_content()
-        assert len(updated_doc.chunks) > 1  # Should be chunked
-        assert updated_doc.get_full_text() == text
+        full_text = document_with_chunks.get_full_text()
+        assert full_text == "First chunk. Second chunk."
 
-    @patch('src.vector_db.domain.models.co')
-    def test_document_replace_content_empty(self, mock_co):
-        """Test replacing content with empty string"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
-        
-        # Add content first
-        document = document.replace_content("Some content")
-        assert document.has_content()
-        
-        # Replace with empty content
-        empty_doc = document.replace_content("")
-        assert not empty_doc.has_content()
-        assert empty_doc.chunks == []
-
-    @patch('src.vector_db.domain.models.co')
-    def test_document_get_chunk_by_id(self, mock_co):
+    def test_document_get_chunk_by_id(self):
         """Test getting chunk by ID"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library_id = str(uuid4())
         document = Document(library_id=library_id)
         
-        document = document.replace_content("Test content")
+        # Add a test chunk
+        chunk = Chunk(document_id=document.id, text="Test content")
+        document_with_chunk = document.model_copy(update={'chunks': [chunk]})
         
-        # Get first chunk
-        chunk = document.chunks[0]
-        found_chunk = document.get_chunk_by_id(chunk.id)
+        # Get chunk by ID
+        found_chunk = document_with_chunk.get_chunk_by_id(chunk.id)
         
         assert found_chunk is not None
         assert found_chunk.id == chunk.id
         
         # Test non-existent chunk
-        non_existent = document.get_chunk_by_id("non-existent-id")
+        non_existent = document_with_chunk.get_chunk_by_id("non-existent-id")
         assert non_existent is None
 
-    @patch('src.vector_db.domain.models.co')
-    def test_document_get_chunk_ids(self, mock_co):
+    def test_document_get_chunk_ids(self):
         """Test getting all chunk IDs"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library_id = str(uuid4())
         document = Document(library_id=library_id)
         
-        document = document.replace_content("Test content")
+        # Add test chunks
+        chunk1 = Chunk(document_id=document.id, text="First chunk")
+        chunk2 = Chunk(document_id=document.id, text="Second chunk")
+        document_with_chunks = document.model_copy(update={'chunks': [chunk1, chunk2]})
         
-        chunk_ids = document.get_chunk_ids()
-        assert len(chunk_ids) == len(document.chunks)
-        assert all(chunk_id in [c.id for c in document.chunks] for chunk_id in chunk_ids)
-
-    @patch('src.vector_db.domain.models.co')
-    def test_document_chunking_strategy(self, mock_co):
-        """Test document chunking with different chunk sizes"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
-        library_id = str(uuid4())
-        document = Document(library_id=library_id)
-        
-        text = "a" * 1000  # 1000 character text
-        
-        # Test different chunk sizes
-        doc_100 = document.replace_content(text, chunk_size=100)
-        doc_500 = document.replace_content(text, chunk_size=500)
-        
-        assert len(doc_100.chunks) > len(doc_500.chunks)
-        assert all(len(chunk.text) <= 100 for chunk in doc_100.chunks)
-        assert all(len(chunk.text) <= 500 for chunk in doc_500.chunks)
+        chunk_ids = document_with_chunks.get_chunk_ids()
+        assert len(chunk_ids) == 2
+        assert chunk1.id in chunk_ids
+        assert chunk2.id in chunk_ids
 
 
 class TestLibrary:
@@ -306,17 +237,10 @@ class TestLibrary:
         assert found_doc is not None
         assert found_doc.id == document.id
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_add_document(self, mock_co):
+    def test_library_add_document(self):
         """Test adding document to library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
-        document = document.replace_content("Test content")
         
         updated_library = library.add_document(document)
         
@@ -324,34 +248,20 @@ class TestLibrary:
         assert updated_library.documents[0].id == document.id
         assert updated_library.documents[0].library_id == library.id
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_add_document_fixes_library_id(self, mock_co):
+    def test_library_add_document_fixes_library_id(self):
         """Test that adding document fixes library_id if different"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         wrong_library_id = str(uuid4())
         document = Document(library_id=wrong_library_id)
-        document = document.replace_content("Test content")
         
         updated_library = library.add_document(document)
         
         assert updated_library.documents[0].library_id == library.id
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_remove_document(self, mock_co):
+    def test_library_remove_document(self):
         """Test removing document from library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
-        document = document.replace_content("Test content")
         
         # Add document
         library = library.add_document(document)
@@ -361,23 +271,17 @@ class TestLibrary:
         updated_library = library.remove_document(document.id)
         assert len(updated_library.documents) == 0
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_update_document(self, mock_co):
+    def test_library_update_document(self):
         """Test updating document in library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         document = Document(library_id=library.id)
-        document = document.replace_content("Original content")
         
         # Add document
         library = library.add_document(document)
         
-        # Update document
-        updated_document = document.replace_content("Updated content")
+        # Update document with new chunks
+        chunk = Chunk(document_id=document.id, text="Updated content")
+        updated_document = document.model_copy(update={'chunks': [chunk]})
         updated_library = library.update_document(updated_document)
         
         # Verify update
@@ -385,52 +289,49 @@ class TestLibrary:
         assert retrieved_doc is not None
         assert retrieved_doc.get_full_text() == "Updated content"
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_get_all_chunks(self, mock_co):
+    def test_library_get_all_chunks(self):
         """Test getting all chunks from library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         
-        # Add documents with content
+        # Create documents first to get proper IDs
         doc1 = Document(library_id=library.id)
-        doc1 = doc1.replace_content("Document 1 content")
         doc2 = Document(library_id=library.id)
-        doc2 = doc2.replace_content("Document 2 content")
+        
+        # Add documents with content using proper document IDs
+        chunk1 = Chunk(document_id=doc1.id, text="Document 1 content")
+        chunk2 = Chunk(document_id=doc2.id, text="Document 2 content")
+        
+        doc1 = doc1.model_copy(update={'chunks': [chunk1]})
+        doc2 = doc2.model_copy(update={'chunks': [chunk2]})
         
         library = library.add_document(doc1)
         library = library.add_document(doc2)
         
         all_chunks = library.get_all_chunks()
         
-        expected_count = len(doc1.chunks) + len(doc2.chunks)
-        assert len(all_chunks) == expected_count
+        assert len(all_chunks) == 2
         assert all(chunk.document_id in [doc1.id, doc2.id] for chunk in all_chunks)
 
-    @patch('src.vector_db.domain.models.co')
-    def test_library_get_all_chunk_ids(self, mock_co):
+    def test_library_get_all_chunk_ids(self):
         """Test getting all chunk IDs from library"""
-        # Mock the Cohere API response
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4] * 192]
-        mock_co.embed.return_value = mock_response
-
         library = Library(name="Test Library")
         
-        # Add documents with content
+        # Create documents first to get proper IDs
         doc1 = Document(library_id=library.id)
-        doc1 = doc1.replace_content("Document 1 content")
         doc2 = Document(library_id=library.id)
-        doc2 = doc2.replace_content("Document 2 content")
+        
+        # Add documents with content using proper document IDs
+        chunk1 = Chunk(document_id=doc1.id, text="Document 1 content")
+        chunk2 = Chunk(document_id=doc2.id, text="Document 2 content")
+        
+        doc1 = doc1.model_copy(update={'chunks': [chunk1]})
+        doc2 = doc2.model_copy(update={'chunks': [chunk2]})
         
         library = library.add_document(doc1)
         library = library.add_document(doc2)
         
         chunk_ids = library.get_all_chunk_ids()
         
-        expected_count = len(doc1.chunks) + len(doc2.chunks)
-        assert len(chunk_ids) == expected_count
-        assert all(chunk_id in [chunk.id for chunk in doc1.chunks + doc2.chunks] for chunk_id in chunk_ids)
+        assert len(chunk_ids) == 2
+        assert chunk1.id in chunk_ids
+        assert chunk2.id in chunk_ids

@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
+from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 
 def test_basic_imports():
@@ -15,22 +16,23 @@ def test_basic_imports():
         pytest.fail(f"Import failed: {e}")
 
 
-@patch('src.vector_db.domain.models.co')
+@patch('src.vector_db.infrastructure.embedding_service.co')
 def test_create_document_function(mock_co):
     """Test the create_document service function"""
     # Mock the Cohere API response
     mock_response = MagicMock()
-    mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]  # 1536 dimensions (rounded)
+    mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
     mock_co.embed.return_value = mock_response
 
-    from src.vector_db.application.services import DocumentService
+    from src.vector_db.api.dependencies import get_document_service
 
     library_id = "lib_123"
     text = "Test document content"
     username = "testuser"
     tags = ["test", "example"]
 
-    document = DocumentService.create_document(
+    document_service = get_document_service()
+    document = document_service.create_document(
         library_id=library_id,
         text=text,
         username=username,
@@ -46,13 +48,14 @@ def test_create_document_function(mock_co):
 
 def test_create_library_function():
     """Test the create_library service function"""
-    from src.vector_db.application.services import LibraryService
+    from src.vector_db.api.dependencies import get_library_service
 
     name = "Test Library"
     username = "testuser"
     tags = ["test", "example"]
 
-    library = LibraryService.create_library(
+    library_service = get_library_service()
+    library = library_service.create_library(
         name=name,
         username=username,
         tags=tags
@@ -64,25 +67,27 @@ def test_create_library_function():
     assert len(library.documents) == 0
 
 
-@patch('src.vector_db.domain.models.co')
+@patch('src.vector_db.infrastructure.embedding_service.co')
 def test_integration_example(mock_co):
     """Test creating library and adding documents"""
     # Mock the Cohere API response
     mock_response = MagicMock()
-    mock_response.embeddings = [[0.1, 0.2, 0.3, 0.4, 0.5] * 307]  # 1536 dimensions (rounded)
+    mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
     mock_co.embed.return_value = mock_response
 
-    from src.vector_db.application.services import LibraryService, DocumentService
+    from src.vector_db.api.dependencies import get_library_service, get_document_service
 
     # Create library
-    library = LibraryService.create_library(
+    library_service = get_library_service()
+    library = library_service.create_library(
         name="Music Collection",
         username="Maria",
         tags=["personal", "favorites"]
     )
 
     # Create document
-    document = DocumentService.create_document(
+    document_service = get_document_service()
+    document = document_service.create_document(
         library_id=library.id,
         text="This is a song about the sea",
         username="Maria",
@@ -90,7 +95,7 @@ def test_integration_example(mock_co):
     )
 
     # Add document to library
-    updated_library = LibraryService.add_document_to_library(library, document)
+    updated_library = library_service.add_document_to_library(library, document)
 
     assert len(updated_library.documents) == 1
     assert updated_library.documents[0].id == document.id
