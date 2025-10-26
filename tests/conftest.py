@@ -3,7 +3,7 @@
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
 from src.vector_db.infrastructure.logging import configure_logging, LogLevel
@@ -61,3 +61,13 @@ def sample_document_data():
         "tags": ["doc_tag"],
         "chunk_size": 50
     }
+
+
+@pytest.fixture  
+def mock_cohere_embed():
+    """Mock Cohere embedding API with standard response"""
+    with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
+        mock_response = MagicMock()
+        mock_response.embeddings = [[0.1] * 1536]
+        mock_co.embed.return_value = mock_response
+        yield mock_co

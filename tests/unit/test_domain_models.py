@@ -39,14 +39,18 @@ class TestMetadata:
         metadata = Metadata()
         original_time = metadata.last_update
         
-        # Wait a tiny bit to ensure timestamp difference
-        import time
-        time.sleep(0.001)
+        # Use mock to ensure timestamp difference
+        from unittest.mock import patch
+        from datetime import datetime
         
-        updated_metadata = metadata.update_timestamp()
-        
-        assert updated_metadata.last_update > original_time
-        assert updated_metadata.creation_time == metadata.creation_time
+        with patch('src.vector_db.domain.models.datetime') as mock_datetime:
+            later_time = datetime(2025, 12, 31, 23, 59, 59)
+            mock_datetime.now.return_value = later_time
+            
+            updated_metadata = metadata.update_timestamp()
+            
+            assert updated_metadata.last_update > original_time
+            assert updated_metadata.creation_time == metadata.creation_time
 
 
 class TestChunk:

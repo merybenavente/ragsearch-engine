@@ -69,7 +69,6 @@ class TestLibraryEndpoints:
         
         # Check current libraries first
         response_check = client.get("/api/v1/libraries/")
-        print(f"Existing libraries: {len(response_check.json())}")
         
         # Create first library
         response1 = client.post("/api/v1/libraries/", json=library_data)
@@ -77,9 +76,6 @@ class TestLibraryEndpoints:
         
         # Try to create second library with same name
         response2 = client.post("/api/v1/libraries/", json=library_data)
-        if response2.status_code != status.HTTP_409_CONFLICT:
-            print(f"Response status: {response2.status_code}")
-            print(f"Response body: {response2.text}")
         assert response2.status_code == status.HTTP_409_CONFLICT
 
     def test_create_library_invalid_data(self):

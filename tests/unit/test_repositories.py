@@ -193,14 +193,12 @@ class TestInMemoryLibraryRepository:
             for _ in range(5):
                 result = self.repository.find_by_id(library.id)
                 read_results.append(result is not None)
-                time.sleep(0.001)  # Small delay
 
         def write_library():
             for i in range(5):
                 updated_library = library.model_copy(update={'name': f'Updated {i}'})
                 result = self.repository.save(updated_library)
                 write_results.append(result is not None)
-                time.sleep(0.001)  # Small delay
 
         # Create threads
         read_thread = Thread(target=read_library)
