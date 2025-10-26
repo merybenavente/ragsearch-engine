@@ -496,6 +496,164 @@ class TestChunkEndpoints:
         
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_search_chunks_success(self):
+        """Test successful chunk search"""
+        # Create library and document with content
+        library_data = {"name": "Search Test Library"}
+        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_id = lib_response.json()["id"]
+        
+        document_data = {
+            "text": "This is test content about machine learning and artificial intelligence.",
+            "chunk_size": 20
+        }
+        doc_response = client.post(
+            f"/api/v1/libraries/{library_id}/documents/", 
+            json=document_data
+        )
+        assert doc_response.status_code == status.HTTP_201_CREATED
+        
+        # Perform search
+        search_data = {
+            "query_text": "machine learning artificial intelligence",
+            "k": 5
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "results" in data
+        assert "total_chunks_searched" in data
+        assert "query_time_ms" in data
+        assert isinstance(data["results"], list)
+        assert data["total_chunks_searched"] > 0
+        assert data["query_time_ms"] > 0
+
+    def test_search_chunks_library_not_found(self):
+        """Test search in non-existent library"""
+        non_existent_library_id = str(uuid4())
+        search_data = {
+            "query_text": "test query",
+            "k": 5
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{non_existent_library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_search_chunks_empty_library(self):
+        """Test search in empty library"""
+        # Create empty library
+        library_data = {"name": "Empty Library"}
+        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_id = lib_response.json()["id"]
+        
+        search_data = {
+            "query_text": "test search",
+            "k": 5
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["results"] == []
+        assert data["total_chunks_searched"] == 0
+
+    def test_search_chunks_invalid_embedding(self):
+        """Test search with invalid embedding"""
+        # Create library
+        library_data = {"name": "Test Library"}
+        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_id = lib_response.json()["id"]
+        
+        # Invalid search data - empty text
+        search_data = {
+            "query_text": "",
+            "k": 5
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_search_chunks_invalid_k(self):
+        """Test search with invalid k value"""
+        # Create library
+        library_data = {"name": "Test Library"}
+        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_id = lib_response.json()["id"]
+        
+        # Invalid k value (too high)
+        search_data = {
+            "query_text": "test query",
+            "k": 500  # Exceeds max of 100
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_search_chunks_response_structure(self):
+        """Test search response structure is correct"""
+        # Create library and document
+        library_data = {"name": "Structure Test Library"}
+        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_id = lib_response.json()["id"]
+        
+        document_data = {"text": "Test content for structure validation."}
+        doc_response = client.post(
+            f"/api/v1/libraries/{library_id}/documents/", 
+            json=document_data
+        )
+        
+        # Perform search
+        search_data = {
+            "query_text": "test content validation",
+            "k": 3
+        }
+        
+        response = client.post(
+            f"/api/v1/libraries/{library_id}/chunks/search",
+            json=search_data
+        )
+        
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        
+        # Validate response structure
+        assert "results" in data
+        assert "total_chunks_searched" in data
+        assert "query_time_ms" in data
+        
+        if data["results"]:
+            result = data["results"][0]
+            assert "chunk" in result
+            assert "similarity_score" in result
+            
+            chunk = result["chunk"]
+            assert "id" in chunk
+            assert "document_id" in chunk
+            assert "text" in chunk
+            assert "embedding" in chunk
+            assert "metadata" in chunk
+
 
 class TestErrorHandling:
     """Test cases for error handling"""

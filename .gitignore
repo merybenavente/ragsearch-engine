@@ -167,3 +167,5 @@ cython_debug/
 # Poetry virtual environment
 .venv/
 
+# Custom
+.github/

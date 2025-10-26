@@ -103,7 +103,40 @@ Once running, visit:
 - `GET /api/v1/libraries/{library_id}/chunks/documents/{document_id}` - Get document chunks
 
 #### Search
-<!-- TODO -->
+- `POST /api/v1/libraries/{library_id}/chunks/search` - Perform text-based similarity search across chunks in a library
+
+**Request Body**:
+```json
+{
+  "query_text": "machine learning algorithms",
+  "k": 10
+}
+```
+
+**Response**:
+```json
+{
+  "results": [
+    {
+      "chunk": {
+        "id": "chunk-uuid",
+        "document_id": "doc-uuid", 
+        "text": "chunk content...",
+        "embedding": [0.1, 0.2, ...],
+        "metadata": {
+          "creation_time": "2023-01-01T00:00:00Z",
+          "last_update": "2023-01-01T00:00:00Z",
+          "username": "user",
+          "tags": ["tag1"]
+        }
+      },
+      "similarity_score": 0.95
+    }
+  ],
+  "total_chunks_searched": 42,
+  "query_time_ms": 15.3
+}
+```
 
 
 ## Example Usage
@@ -127,6 +160,16 @@ curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/" \
     "text": "This is my research document content...",
     "chunk_size": 500,
     "tags": ["important"]
+  }'
+```
+
+### Search for Similar Content
+```bash
+curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/chunks/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_text": "machine learning neural networks",
+    "k": 5
   }'
 ```
 
