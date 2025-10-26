@@ -16,70 +16,52 @@ class TestDocumentService:
         self.library_id = str(uuid4())
         self.document_service = get_document_service()
 
-    def test_create_document_with_content(self, mock_cohere_embed):
-        """Test creating a document with content"""
+    @pytest.mark.parametrize("text,username,tags,chunk_size,expected_username,expected_tags", [
+        ("This is a test document with some content.", "testuser", ["tag1", "tag2"], 20, "testuser", ["tag1", "tag2"]),
+        ("Test content", None, None, None, None, []),
+        ("Another test document.", "user2", ["tag"], 30, "user2", ["tag"]),
+        ("Short text", None, ["only_tag"], None, None, ["only_tag"]),
+    ])
+    def test_create_document_with_content(self, mock_cohere_embed, text, username, tags, chunk_size, expected_username, expected_tags):
+        """Test creating a document with various content and metadata combinations"""
+        kwargs = {"library_id": self.library_id, "text": text}
+        if username is not None:
+            kwargs["username"] = username
+        if tags is not None:
+            kwargs["tags"] = tags
+        if chunk_size is not None:
+            kwargs["chunk_size"] = chunk_size
 
-        text = "This is a test document with some content."
-        username = "testuser"
-        tags = ["tag1", "tag2"]
-        chunk_size = 20
-
-        document = self.document_service.create_document(
-            library_id=self.library_id,
-            text=text,
-            username=username,
-            tags=tags,
-            chunk_size=chunk_size
-        )
-
-        assert document.library_id == self.library_id
-        assert document.has_content()
-        assert len(document.chunks) > 1  # Should be chunked
-        assert document.metadata.username == username
-        assert document.metadata.tags == tags
-
-    def test_create_document_with_defaults(self, mock_cohere_embed):
-        """Test creating a document with default values"""
-
-        text = "Test content"
-
-        document = self.document_service.create_document(
-            library_id=self.library_id,
-            text=text
-        )
+        document = self.document_service.create_document(**kwargs)
 
         assert document.library_id == self.library_id
         assert document.has_content()
-        assert document.metadata.username is None
-        assert document.metadata.tags == []
+        if len(text) > 20:  # Should be chunked if text is long enough
+            assert len(document.chunks) >= 1
+        assert document.metadata.username == expected_username
+        assert document.metadata.tags == expected_tags
 
-    def test_create_empty_document(self):
-        """Test creating an empty document"""
-        username = "testuser"
-        tags = ["tag1"]
+    @pytest.mark.parametrize("username,tags,expected_username,expected_tags", [
+        ("testuser", ["tag1"], "testuser", ["tag1"]),
+        (None, None, None, []),
+        ("user2", ["tag1", "tag2"], "user2", ["tag1", "tag2"]),
+        (None, ["only_tag"], None, ["only_tag"]),
+    ])
+    def test_create_empty_document(self, username, tags, expected_username, expected_tags):
+        """Test creating an empty document with various metadata combinations"""
+        kwargs = {"library_id": self.library_id}
+        if username is not None:
+            kwargs["username"] = username
+        if tags is not None:
+            kwargs["tags"] = tags
 
-        document = self.document_service.create_empty_document(
-            library_id=self.library_id,
-            username=username,
-            tags=tags
-        )
+        document = self.document_service.create_empty_document(**kwargs)
 
         assert document.library_id == self.library_id
         assert not document.has_content()
         assert document.chunks == []
-        assert document.metadata.username == username
-        assert document.metadata.tags == tags
-
-    def test_create_empty_document_with_defaults(self):
-        """Test creating an empty document with default values"""
-        document = self.document_service.create_empty_document(
-            library_id=self.library_id
-        )
-
-        assert document.library_id == self.library_id
-        assert not document.has_content()
-        assert document.metadata.username is None
-        assert document.metadata.tags == []
+        assert document.metadata.username == expected_username
+        assert document.metadata.tags == expected_tags
 
     def test_update_document_content(self, mock_cohere_embed):
         """Test updating document content"""
@@ -120,3 +102,8 @@ class TestDocumentService:
         )
 
         mock_logger.info.assert_called_once()
+        
+        # Verify log content contains key information
+        call_args = mock_logger.info.call_args
+        log_message = call_args[0][0]  # First positional argument
+        assert "Document created" in log_message

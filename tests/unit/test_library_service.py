@@ -15,32 +15,26 @@ class TestLibraryService:
         """Setup test fixtures"""
         self.library_service = get_library_service()
 
-    def test_create_library(self):
-        """Test creating a library"""
-        name = "Test Library"
-        username = "testuser"
-        tags = ["tag1", "tag2"]
+    @pytest.mark.parametrize("name,username,tags,expected_username,expected_tags", [
+        ("Test Library", "testuser", ["tag1", "tag2"], "testuser", ["tag1", "tag2"]),
+        ("Simple Library", None, None, None, []),
+        ("Another Library", "user2", ["tag"], "user2", ["tag"]),
+        ("Tag Only Library", None, ["only_tag"], None, ["only_tag"]),
+    ])
+    def test_create_library(self, name, username, tags, expected_username, expected_tags):
+        """Test creating a library with various metadata combinations"""
+        kwargs = {"name": name}
+        if username is not None:
+            kwargs["username"] = username
+        if tags is not None:
+            kwargs["tags"] = tags
 
-        library = self.library_service.create_library(
-            name=name,
-            username=username,
-            tags=tags
-        )
+        library = self.library_service.create_library(**kwargs)
 
         assert library.name == name
-        assert library.metadata.username == username
-        assert library.metadata.tags == tags
+        assert library.metadata.username == expected_username
+        assert library.metadata.tags == expected_tags
         assert library.documents == []
-
-    def test_create_library_with_defaults(self):
-        """Test creating a library with default values"""
-        name = "Test Library"
-
-        library = self.library_service.create_library(name=name)
-
-        assert library.name == name
-        assert library.metadata.username is None
-        assert library.metadata.tags == []
 
     def test_add_document_to_library(self):
         """Test adding a document to a library"""
@@ -178,3 +172,8 @@ class TestLibraryService:
         )
 
         mock_logger.info.assert_called_once()
+        
+        # Verify log content contains key information
+        call_args = mock_logger.info.call_args
+        log_message = call_args[0][0]  # First positional argument
+        assert "Library created" in log_message

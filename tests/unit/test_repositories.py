@@ -1,5 +1,6 @@
 """Unit tests for infrastructure repositories"""
 
+import pytest
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
 from threading import Thread
@@ -45,24 +46,30 @@ class TestInMemoryLibraryRepository:
 
         assert saved_library.name == "Updated Name"
 
-    def test_find_by_id_existing(self):
-        """Test finding an existing library by ID"""
-        library = Library(name="Test Library")
-        self.repository.save(library)
+    @pytest.mark.parametrize("exists,expected_result", [
+        (True, "found"),
+        (False, None),
+    ])
+    def test_find_by_id(self, exists, expected_result):
+        """Test finding library by ID for existing and non-existing cases"""
+        if exists:
+            # Create and save a library
+            library = Library(name="Test Library")
+            self.repository.save(library)
+            search_id = library.id
+        else:
+            # Use a non-existent ID
+            search_id = str(uuid4())
+            library = None
 
-        found_library = self.repository.find_by_id(library.id)
+        found_library = self.repository.find_by_id(search_id)
 
-        assert found_library is not None
-        assert found_library.id == library.id
-        assert found_library.name == library.name
-
-    def test_find_by_id_not_found(self):
-        """Test finding a non-existent library by ID"""
-        non_existent_id = str(uuid4())
-
-        found_library = self.repository.find_by_id(non_existent_id)
-
-        assert found_library is None
+        if expected_result == "found":
+            assert found_library is not None
+            assert found_library.id == library.id
+            assert found_library.name == library.name
+        else:
+            assert found_library is None
 
     def test_find_all_empty(self):
         """Test finding all libraries when repository is empty"""
@@ -107,22 +114,24 @@ class TestInMemoryLibraryRepository:
 
         assert result is False
 
-    def test_exists_existing_library(self):
-        """Test checking if an existing library exists"""
-        library = Library(name="Test Library")
-        self.repository.save(library)
+    @pytest.mark.parametrize("exists,expected_result", [
+        (True, True),
+        (False, False),
+    ])
+    def test_exists(self, exists, expected_result):
+        """Test checking if library exists for existing and non-existing cases"""
+        if exists:
+            # Create and save a library
+            library = Library(name="Test Library")
+            self.repository.save(library)
+            search_id = library.id
+        else:
+            # Use a non-existent ID
+            search_id = str(uuid4())
 
-        result = self.repository.exists(library.id)
+        result = self.repository.exists(search_id)
 
-        assert result is True
-
-    def test_exists_non_existent_library(self):
-        """Test checking if a non-existent library exists"""
-        non_existent_id = str(uuid4())
-
-        result = self.repository.exists(non_existent_id)
-
-        assert result is False
+        assert result is expected_result
 
     def test_find_by_name_existing(self):
         """Test finding an existing library by name"""
