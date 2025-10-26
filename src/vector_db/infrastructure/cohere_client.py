@@ -10,7 +10,8 @@ def _get_cohere_client():
     try:
         api_key = os.environ.get("COHERE_API_KEY")
         if api_key:
-            return cohere.Client(api_key)
+            timeout = float(os.environ.get("COHERE_TIMEOUT", "30"))  # Default 30 seconds
+            return cohere.Client(api_key, timeout=timeout)
         logger.warning("Cohere API key not found in environment variables")
         return None
     except Exception as e:
