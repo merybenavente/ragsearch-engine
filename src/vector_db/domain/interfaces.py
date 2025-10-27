@@ -1,6 +1,7 @@
 """Domain interfaces for dependency injection"""
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple, Optional
+from .models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID
 
 
 class EmbeddingService(ABC):
@@ -21,4 +22,126 @@ class EmbeddingService(ABC):
         Raises:
             RuntimeError: If the embedding service is not available
         """
+        pass
+
+
+class VectorIndex(ABC):
+    """Abstract interface for vector indexes"""
+    
+    @abstractmethod
+    def index_chunks(self, chunks: List['Chunk']) -> None:
+        """
+        Index a list of chunks for efficient search.
+        
+        Args:
+            chunks: List of chunks to index
+        """
+        pass
+    
+    @abstractmethod
+    def remove_chunks(self, chunk_ids: List[str]) -> None:
+        """
+        Remove chunks from the index.
+        
+        Args:
+            chunk_ids: List of chunk IDs to remove
+        """
+        pass
+    
+    @abstractmethod
+    def search(self, chunks: List['Chunk'], query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple['Chunk', float]]:
+        """
+        Search for the k most similar chunks to the query within the given chunks.
+        
+        Args:
+            chunks: List of chunks to search through
+            query_embedding: Query embedding vector
+            k: Number of results to return
+            min_similarity: Minimum similarity threshold (0.0 to 1.0)
+            
+        Returns:
+            List of (chunk, similarity_score) tuples ordered by similarity
+        """
+        pass
+
+
+class DocumentRepository(ABC):
+    """Abstract interface for document persistence"""
+    
+    @abstractmethod
+    def save(self, document: Document) -> None:
+        """Save a document"""
+        pass
+    
+    @abstractmethod
+    def get(self, document_id: DocumentID) -> Optional[Document]:
+        """Get a document by ID"""
+        pass
+    
+    @abstractmethod
+    def get_by_library(self, library_id: LibraryID) -> List[Document]:
+        """Get all documents in a library"""
+        pass
+    
+    @abstractmethod
+    def delete(self, document_id: DocumentID) -> None:
+        """Delete a document"""
+        pass
+    
+    @abstractmethod
+    def exists(self, document_id: DocumentID) -> bool:
+        """Check if a document exists"""
+        pass
+
+
+class LibraryRepository(ABC):
+    """Abstract interface for library persistence"""
+    
+    @abstractmethod
+    def save(self, library: Library) -> None:
+        """Save a library"""
+        pass
+    
+    @abstractmethod
+    def get(self, library_id: LibraryID) -> Optional[Library]:
+        """Get a library by ID"""
+        pass
+    
+    @abstractmethod
+    def delete(self, library_id: LibraryID) -> None:
+        """Delete a library"""
+        pass
+    
+    @abstractmethod
+    def exists(self, library_id: LibraryID) -> bool:
+        """Check if a library exists"""
+        pass
+    
+    @abstractmethod
+    def list_all(self) -> List[Library]:
+        """List all libraries"""
+        pass
+
+
+class SearchIndex(ABC):
+    """Abstract interface for search indexing - infrastructure concern"""
+    
+    @abstractmethod
+    def index_document(self, document: Document) -> None:
+        """Index a document and all its chunks"""
+        pass
+    
+    @abstractmethod
+    def remove_document(self, document_id: DocumentID) -> None:
+        """Remove a document and all its chunks from the index"""
+        pass
+    
+    @abstractmethod
+    def search_chunks(self, chunks: List[Chunk], query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple[Chunk, float]]:
+        """Search for similar chunks within the provided chunk list"""
+        pass
+    
+    @abstractmethod
+    def create_library_index(self, library_id: LibraryID, index_type: str) -> None:
+        """Create an index for a library"""
         pass

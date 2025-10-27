@@ -19,6 +19,7 @@ class CreateLibraryRequest(BaseModel):
     name: str = Field(..., min_length=1, description="Library name")
     username: Optional[str] = Field(None, description="Username")
     tags: List[str] = Field(default_factory=list, description="Tags")
+    index_type: str = Field(default="naive", description="Index type (naive, lsh, vptree)")
 
 
 class UpdateLibraryRequest(BaseModel):
@@ -37,7 +38,7 @@ class LibraryResponse(BaseModel):
 
 class CreateDocumentRequest(BaseModel):
     """Request schema for creating a document"""
-    text: str = Field(..., min_length=1, description="Document content")
+    text: Optional[str] = Field(None, description="Document content (optional for empty document)")
     username: Optional[str] = Field(None, description="Username")
     tags: List[str] = Field(default_factory=list, description="Tags")
     chunk_size: int = Field(default=500, ge=1, le=2000, description="Chunk size for splitting")

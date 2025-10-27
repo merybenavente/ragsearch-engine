@@ -1,6 +1,6 @@
 import numpy as np
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Set
 from datetime import datetime
 from uuid import uuid4
 
@@ -77,78 +77,122 @@ class Document(BaseModel):
                 return chunk
         return None
 
+    @classmethod
+    def create_with_chunks(
+        cls,
+        library_id: LibraryID,
+        chunks: List[Chunk],
+        username: Optional[str] = None,
+        tags: Optional[List[str]] = None
+    ) -> 'Document':
+        """Create a new document with pre-created chunks"""
+        if tags is None:
+            tags = []
+        
+        metadata = Metadata(username=username, tags=tags)
+        return cls(library_id=library_id, chunks=chunks, metadata=metadata)
+
+    @classmethod
+    def create_empty(
+        cls,
+        library_id: LibraryID,
+        username: Optional[str] = None,
+        tags: Optional[List[str]] = None
+    ) -> 'Document':
+        """Create an empty document (no content, no chunks)"""
+        if tags is None:
+            tags = []
+        
+        metadata = Metadata(username=username, tags=tags)
+        return cls(library_id=library_id, metadata=metadata)
+
+    def update_chunks(self, new_chunks: List[Chunk]) -> 'Document':
+        """Update document with new chunks"""
+        return self.model_copy(update={
+            'chunks': new_chunks,
+            'metadata': self.metadata.update_timestamp()
+        })
+
+    def clear_content(self) -> 'Document':
+        """Remove all chunks from document"""
+        return self.model_copy(update={
+            'chunks': [],
+            'metadata': self.metadata.update_timestamp()
+        })
+
 
 
 class Library(BaseModel):
     """
-    Library containing multiple documents with metadata.
+    Library containing document references with metadata.
 
     Libraries are the top-level organizational unit for documents.
+    In DDD approach, Library manages document membership, not document lifecycle.
     """
     id: LibraryID = Field(default_factory=lambda: str(uuid4()))
     name: str = Field(..., min_length=1, description="Library name")
-    documents: List[Document] = Field(default_factory=list)
+    document_ids: Set[DocumentID] = Field(default_factory=set, description="References to documents in this library")
     metadata: Metadata = Field(default_factory=Metadata)
+    index_type: str = Field(default="naive", description="Preferred index type for this library")
 
-    def get_document_ids(self) -> List[DocumentID]:
-        """Get list of document IDs in this library"""
-        return [document.id for document in self.documents]
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        username: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        index_type: str = "naive"
+    ) -> 'Library':
+        """Create a new library"""
+        if tags is None:
+            tags = []
+        
+        metadata = Metadata(username=username, tags=tags)
+        return cls(name=name, metadata=metadata, index_type=index_type)
 
-    def document_exists(self, document_id: DocumentID) -> bool:
-        """Check if document exists in library"""
-        return document_id in self.get_document_ids()
-
-    def get_document_by_id(self, document_id: DocumentID) -> Optional[Document]:
-        """Get a specific document by ID"""
-        for document in self.documents:
-            if document.id == document_id:
-                return document
-        return None
-
-    def add_document(self, document: Document) -> 'Library':
-        """Add a document to the library"""
-        # Ensure document has correct library_id
-        if document.library_id != self.id:
-            document = document.model_copy(update={'library_id': self.id})
-
-        updated_documents = self.documents + [document]
+    def add_document_reference(self, document_id: DocumentID) -> 'Library':
+        """Add a document reference to this library"""
+        if document_id in self.document_ids:
+            raise ValueError(f"Document {document_id} already exists in library")
+        
+        updated_document_ids = self.document_ids.copy()
+        updated_document_ids.add(document_id)
         return self.model_copy(update={
-            'documents': updated_documents,
+            'document_ids': updated_document_ids,
             'metadata': self.metadata.update_timestamp()
         })
 
-    def remove_document(self, document_id: DocumentID) -> 'Library':
-        """Remove a document from the library"""
-        updated_documents = [doc for doc in self.documents if doc.id != document_id]
+    def remove_document_reference(self, document_id: DocumentID) -> 'Library':
+        """Remove a document reference from this library"""
+        updated_document_ids = self.document_ids.copy()
+        updated_document_ids.discard(document_id)  # discard doesn't raise if not present
         return self.model_copy(update={
-            'documents': updated_documents,
+            'document_ids': updated_document_ids,
             'metadata': self.metadata.update_timestamp()
         })
 
-    def update_document(self, updated_document: Document) -> 'Library':
-        """Replace a document in the library with an updated version"""
-        updated_documents = []
-        for doc in self.documents:
-            if doc.id == updated_document.id:
-                # Ensure correct library_id
-                if updated_document.library_id != self.id:
-                    updated_document = updated_document.model_copy(update={'library_id': self.id})
-                updated_documents.append(updated_document)
-            else:
-                updated_documents.append(doc)
+    def has_document(self, document_id: DocumentID) -> bool:
+        """Check if library has a document reference"""
+        return document_id in self.document_ids
 
-        return self.model_copy(update={
-            'documents': updated_documents,
-            'metadata': self.metadata.update_timestamp()
-        })
+    def update_metadata(
+        self,
+        name: Optional[str] = None,
+        tags: Optional[List[str]] = None
+    ) -> 'Library':
+        """Update library metadata"""
+        if name is None and tags is None:
+            return self
+        
+        updates = {}
+        if name is not None:
+            updates['name'] = name
+        
+        new_metadata = self.metadata
+        if tags is not None:
+            new_metadata = new_metadata.model_copy(update={'tags': tags})
+        new_metadata = new_metadata.update_timestamp()
+        updates['metadata'] = new_metadata
+        
+        return self.model_copy(update=updates)
 
-    def get_all_chunks(self) -> List[Chunk]:
-        """Get all chunks from all documents in the library"""
-        chunks = []
-        for document in self.documents:
-            chunks.extend(document.chunks)
-        return chunks
-
-    def get_all_chunk_ids(self) -> List[ChunkID]:
-        """Get all chunk IDs from all documents in the library"""
-        return [chunk.id for chunk in self.get_all_chunks()]

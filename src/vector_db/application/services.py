@@ -1,11 +1,14 @@
 """Application services - business logic"""
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from datetime import datetime
 import numpy as np
 
 from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata, EMBEDDING_MODEL
-from ..domain.interfaces import EmbeddingService
+from ..domain.interfaces import EmbeddingService, VectorIndex
 from ..infrastructure.logging import get_logger
+
+if TYPE_CHECKING:
+    from .index_service import IndexService
 
 logger = get_logger(__name__)
 
@@ -113,26 +116,31 @@ class DocumentService:
 
 
 class LibraryService:
-    """Service layer for library operations"""
+    """Service layer for library operations - pure data management"""
+
+    def __init__(self, embedding_service: EmbeddingService):
+        self._embedding_service = embedding_service
 
     def create_library(
         self,
         name: str,
         username: Optional[str] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
+        index_type: str = "naive"
     ) -> Library:
-        """Create a new library"""
+        """Create a new library with specified index type"""
         if tags is None:
             tags = []
 
         metadata = Metadata(username=username, tags=tags)
-        library = Library(name=name, metadata=metadata)
+        library = Library(name=name, metadata=metadata, index_type=index_type)
 
-        logger.info("Library created", lib_id=library.id, name=name)
+        logger.info("Library created", lib_id=library.id, name=name, index_type=index_type)
         return library
 
+
     def add_document_to_library(self, library: Library, document: Document) -> Library:
-        """Add a document to a library"""
+        """Add a document to a library - pure data management"""
         if library.document_exists(document.id):
             logger.warning("Duplicate document", doc_id=document.id)
             raise ValueError(f"Document {document.id} already exists in library")
@@ -142,7 +150,7 @@ class LibraryService:
         return result
 
     def remove_document_from_library(self, library: Library, document_id: DocumentID) -> Library:
-        """Remove a document from a library"""
+        """Remove a document from a library - pure data management"""
         if not library.document_exists(document_id):
             raise ValueError(f"Document {document_id} not found in library")
 
@@ -150,8 +158,9 @@ class LibraryService:
         logger.info("Document removed", doc_id=document_id, total_docs=len(result.documents))
         return result
 
+    # TODO: this should probably be moved to the document service?
     def update_document_in_library(self, library: Library, updated_document: Document) -> Library:
-        """Update a document within a library"""
+        """Update a document within a library - pure data management"""
         if not library.document_exists(updated_document.id):
             raise ValueError(f"Document {updated_document.id} not found in library")
 
@@ -233,75 +242,45 @@ class SearchService:
     """
     Service layer for vector similarity search operations.
 
-    This service implements k-nearest neighbor search using cosine similarity
-    to find the most relevant chunks for a given query embedding.
+    This service orchestrates all search operations and manages library-scoped indexing.
+    It maintains indexes per library and provides search functionality.
     """
     
-    def __init__(self, embedding_service: EmbeddingService):
+    def __init__(self, embedding_service: EmbeddingService, index_service: 'IndexService'):
         self._embedding_service = embedding_service
+        self._index_service = index_service
+        self._library_indexes: Dict[LibraryID, VectorIndex] = {}
+        self._library_index_types: Dict[LibraryID, str] = {}
 
-    def _create_query_embedding(self, text: str) -> List[float]:
-        """Convert query text to embedding using same model as chunks"""
-        return self._embedding_service.create_embedding(text, input_type="search_query")
+    def create_library_index(self, library_id: LibraryID, index_type: str = "naive") -> None:
+        """Create an index for a library"""
+        self._library_indexes[library_id] = self._index_service.create_index(index_type)
+        self._library_index_types[library_id] = index_type
+        logger.info("Library index created", lib_id=library_id, index_type=index_type)
 
-    def _perform_search(
-        self,
-        chunks: List[Chunk],
-        query_text: str,
-        k: int,
-        min_similarity: float,
-        context: dict
-    ) -> List[Tuple[Chunk, float]]:
-        """
-        Common search logic for both library and document searches.
+    def _get_library_index(self, library_id: LibraryID) -> VectorIndex:
+        """Get the index for a library, creating it with default type if missing"""
+        if library_id not in self._library_indexes:
+            index_type = self._library_index_types.get(library_id, "naive")
+            self._library_indexes[library_id] = self._index_service.create_index(index_type)
+            if library_id not in self._library_index_types:
+                self._library_index_types[library_id] = index_type
+        return self._library_indexes[library_id]
 
-        Args:
-            chunks: List of chunks to search in
-            query_text: Query text to search for
-            k: Number of results to return
-            min_similarity: Minimum similarity threshold
-            context: Dictionary with context info for logging (e.g., lib_id, doc_id)
+    def index_document_chunks(self, library_id: LibraryID, chunks: List[Chunk]) -> None:
+        """Add document chunks to the library's index"""
+        if chunks:
+            index = self._get_library_index(library_id)
+            index.index_chunks(chunks)
+            logger.debug("Indexed document chunks", lib_id=library_id, chunk_count=len(chunks))
 
-        Returns:
-            List of (chunk, similarity_score) tuples, sorted by similarity descending
-        """
-        query_embedding = self._create_query_embedding(query_text)
+    def remove_document_chunks(self, library_id: LibraryID, chunk_ids: List[str]) -> None:
+        """Remove document chunks from the library's index"""
+        if chunk_ids:
+            index = self._get_library_index(library_id)
+            index.remove_chunks(chunk_ids)
+            logger.debug("Removed document chunks from index", lib_id=library_id, chunk_count=len(chunk_ids))
 
-        # Calculate similarities for all chunks
-        similarities = []
-        for chunk in chunks:
-            if not chunk.embedding:
-                logger.warning("Chunk has no embedding", chunk_id=chunk.id)
-                continue
-
-            similarity = self._cosine_similarity(query_embedding, chunk.embedding)
-            if similarity >= min_similarity:
-                similarities.append((chunk, similarity))
-
-        # Sort by similarity (descending) and take top k
-        similarities.sort(key=lambda x: x[1], reverse=True)
-
-        # Handle case where we have fewer results than requested k
-        if len(similarities) < k:
-            logger.warning(
-                "Fewer results than requested",
-                requested_k=k,
-                available_results=len(similarities),
-                **context
-            )
-
-        results = similarities[:k]
-
-        logger.info(
-            "Document search completed",
-            query_length=len(query_embedding),
-            total_chunks=len(chunks),
-            results_returned=len(results),
-            min_similarity=min_similarity,
-            **context
-        )
-
-        return results
 
     def search_chunks(
         self,
@@ -327,17 +306,17 @@ class SearchService:
             logger.debug("No chunks found in library", lib_id=library.id)
             return []
 
-        return self._perform_search(
-            chunks=chunks,
-            query_text=query_text,
-            k=k,
-            min_similarity=min_similarity,
-            context={"lib_id": library.id}
-        )
+        index = self._get_library_index(library.id)
+        query_embedding = self._embedding_service.create_embedding(query_text, input_type="search_query")
+        
+        results = index.search(chunks, query_embedding, k, min_similarity)
+        logger.info("Library search completed", lib_id=library.id, results_count=len(results))
+        return results
 
     def search_chunks_in_document(
         self,
-        document: Document,
+        library: Library,
+        document_id: DocumentID,
         query_text: str,
         k: int = 10,
         min_similarity: float = 0.0
@@ -346,7 +325,8 @@ class SearchService:
         Search for the k most similar chunks in a specific document.
 
         Args:
-            document: Document to search in
+            library: Library containing the document
+            document_id: ID of the document to search in
             query_text: Query text to search for
             k: Number of results to return
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
@@ -354,47 +334,18 @@ class SearchService:
         Returns:
             List of (chunk, similarity_score) tuples, sorted by similarity descending
         """
-        if not document.chunks:
-            logger.debug("Document has no chunks", doc_id=document.id)
+        if not library.document_exists(document_id):
+            raise ValueError(f"Document {document_id} not found in library")
+
+        document = library.get_document_by_id(document_id)
+        if not document or not document.chunks:
+            logger.debug("Document has no chunks", doc_id=document_id)
             return []
 
-        return self._perform_search(
-            chunks=document.chunks,
-            query_text=query_text,
-            k=k,
-            min_similarity=min_similarity,
-            context={"doc_id": document.id}
-        )
+        index = self._get_library_index(library.id)
+        query_embedding = self._embedding_service.create_embedding(query_text, input_type="search_query")
+        
+        results = index.search(document.chunks, query_embedding, k, min_similarity)
+        logger.info("Document search completed", doc_id=document_id, results_count=len(results))
+        return results
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        """
-        Calculate cosine similarity between two vectors.
-
-        Args:
-            vec1: First vector
-            vec2: Second vector
-
-        Returns:
-            Cosine similarity score between 0 and 1
-        """
-        if len(vec1) != len(vec2):
-            logger.error("Vector dimensions don't match", dim1=len(vec1), dim2=len(vec2))
-            return 0.0
-
-        # Convert to numpy arrays for efficient computation
-        v1 = np.array(vec1)
-        v2 = np.array(vec2)
-
-        # Calculate cosine similarity
-        dot_product = np.dot(v1, v2)
-        norm_v1 = np.linalg.norm(v1)
-        norm_v2 = np.linalg.norm(v2)
-
-        # Avoid division by zero
-        if norm_v1 == 0 or norm_v2 == 0:
-            return 0.0
-
-        similarity = dot_product / (norm_v1 * norm_v2)
-
-        # Ensure result is between 0 and 1
-        return max(0.0, min(1.0, similarity))
