@@ -5,7 +5,7 @@ import os
 from uuid import uuid4
 import numpy as np
 
-from src.vector_db.api.dependencies import get_search_service, get_document_service
+from src.vector_db.api.dependencies import get_vector_db_service
 from src.vector_db.domain.models import Document, Library, Chunk
 
 
@@ -17,9 +17,7 @@ class TestSemanticSearchQuality:
 
     def setup_method(self):
         """Setup test fixtures"""
-        self.library_id = str(uuid4())
-        self.search_service = get_search_service()
-        self.document_service = get_document_service()
+        self.vector_db_service = get_vector_db_service()
 
         # Skip tests if COHERE_API_KEY is not set
         if not os.getenv('COHERE_API_KEY'):
@@ -27,9 +25,12 @@ class TestSemanticSearchQuality:
 
     def test_semantic_similarity_basic(self):
         """Test basic semantic similarity with clear content hierarchy"""
+        # Create a library first
+        library = self.vector_db_service.create_library(name="Test Library")
+        
         # Create a document about a specific, concrete topic
-        document = self.document_service.create_document(
-            library_id=self.library_id,
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
             text="The golden retriever is a medium-large dog breed known for its friendly temperament "
             "and intelligence. Originally bred for hunting waterfowl, these dogs are excellent "
             "family pets and are commonly used as service animals. Golden retrievers have a "
@@ -49,8 +50,8 @@ class TestSemanticSearchQuality:
         # Get all scores
         scores = {}
         for query in queries:
-            results = self.search_service.search_chunks_in_document(
-                document=document,
+            results = self.vector_db_service.search_document(
+                document_id=document.id,
                 query_text=query,
                 k=1,
                 min_similarity=0.0
@@ -69,8 +70,11 @@ class TestSemanticSearchQuality:
     def test_semantic_similarity_synonyms(self):
         """Test that semantic search handles synonyms correctly"""
         try:
-            document = self.document_service.create_document(
-                library_id=self.library_id,
+            # Create a library first
+            library = self.vector_db_service.create_library(name="Test Library")
+            
+            document = self.vector_db_service.create_document(
+                library_id=library.id,
                 text="The automobile industry has revolutionized transportation. Cars have become "
                 "essential for daily commuting and long-distance travel. The automotive sector "
                 "employs millions of people worldwide and drives economic growth."
@@ -84,15 +88,15 @@ class TestSemanticSearchQuality:
             ]
 
             for query1, query2 in synonym_pairs:
-                results1 = self.search_service.search_chunks_in_document(
-                    document=document,
+                results1 = self.vector_db_service.search_document(
+                    document_id=document.id,
                     query_text=query1,
                     k=3,
                     min_similarity=0.0
                 )
 
-                results2 = self.search_service.search_chunks_in_document(
-                    document=document,
+                results2 = self.vector_db_service.search_document(
+                    document_id=document.id,
                     query_text=query2,
                     k=3,
                     min_similarity=0.0
@@ -117,8 +121,11 @@ class TestSemanticSearchQuality:
 
     def test_semantic_similarity_context(self):
         """Test that semantic search understands context"""
-        document = self.document_service.create_document(
-            library_id=self.library_id,
+        # Create a library first
+        library = self.vector_db_service.create_library(name="Test Library")
+        
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
             text="Python is a versatile programming language used for web development, "
             "data science, and artificial intelligence. It has a simple syntax and "
             "extensive libraries. Python developers can build applications quickly "
@@ -136,8 +143,8 @@ class TestSemanticSearchQuality:
         # Get all scores
         scores = {}
         for query in context_queries:
-            results = self.search_service.search_chunks_in_document(
-                document=document,
+            results = self.vector_db_service.search_document(
+                document_id=document.id,
                 query_text=query,
                 k=1,
                 min_similarity=0.0
@@ -154,8 +161,11 @@ class TestSemanticSearchQuality:
 
     def test_semantic_similarity_multilingual(self):
         """Test semantic search with multilingual content"""
-        document = self.document_service.create_document(
-            library_id=self.library_id,
+        # Create a library first
+        library = self.vector_db_service.create_library(name="Test Library")
+        
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
             text="La inteligencia artificial es una rama de la informática que busca crear "
             "sistemas capaces de realizar tareas que normalmente requieren inteligencia "
             "humana. El machine learning es una subcategoría que permite a las máquinas "
@@ -174,8 +184,8 @@ class TestSemanticSearchQuality:
         # Get all scores
         scores = {}
         for query in multilingual_queries:
-            results = self.search_service.search_chunks_in_document(
-                document=document,
+            results = self.vector_db_service.search_document(
+                document_id=document.id,
                 query_text=query,
                 k=1,
                 min_similarity=0.0
@@ -192,35 +202,31 @@ class TestSemanticSearchQuality:
 
     def test_semantic_similarity_across_documents(self):
         """Test semantic search across multiple documents in a library"""
-        library = Library(name="Test Library")
+        library = self.vector_db_service.create_library(name="Test Library")
 
         # Create documents with related but different content
-        doc1 = self.document_service.create_document(
+        doc1 = self.vector_db_service.create_document(
             library_id=library.id,
             text="Machine learning algorithms can be supervised or unsupervised. "
             "Supervised learning uses labeled training data to make predictions."
         )
 
-        doc2 = self.document_service.create_document(
+        doc2 = self.vector_db_service.create_document(
             library_id=library.id,
             text="Deep learning uses neural networks with multiple layers. "
             "Convolutional neural networks are particularly effective for image processing."
         )
 
-        doc3 = self.document_service.create_document(
+        doc3 = self.vector_db_service.create_document(
             library_id=library.id,
             text="Natural language processing enables computers to understand human language. "
             "Techniques include text classification, sentiment analysis, and translation."
         )
 
-        library = library.add_document(doc1)
-        library = library.add_document(doc2)
-        library = library.add_document(doc3)
-
         # Test search across all documents
         query = "artificial intelligence"
-        results = self.search_service.search_chunks(
-            library=library,
+        results = self.vector_db_service.search_library(
+            library_id=library.id,
             query_text=query,
             k=5,
             min_similarity=0.0
@@ -238,8 +244,11 @@ class TestSemanticSearchQuality:
 
     def test_semantic_similarity_ranking(self):
         """Test that semantic search properly ranks results by relevance"""
-        document = self.document_service.create_document(
-            library_id=self.library_id,
+        # Create a library first
+        library = self.vector_db_service.create_library(name="Test Library")
+        
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
             text="Python is a high-level programming language known for its simplicity and readability. "
             "It's widely used in data science, web development, and artificial intelligence. "
             "The language has a large ecosystem of libraries and frameworks. "
@@ -256,8 +265,8 @@ class TestSemanticSearchQuality:
 
         all_results = []
         for query in queries:
-            results = self.search_service.search_chunks_in_document(
-                document=document,
+            results = self.vector_db_service.search_document(
+                document_id=document.id,
                 query_text=query,
                 k=3,
                 min_similarity=0.0
@@ -273,45 +282,3 @@ class TestSemanticSearchQuality:
         # Python programming should be most relevant
         assert python_score >= data_science_score * 0.8, "Python query should be more relevant than data science"
         assert python_score >= web_dev_score * 0.8, "Python query should be more relevant than web development"
-
-    def test_embedding_consistency(self):
-        """Test that embeddings are consistent for the same text"""
-        text = "This is a test text for embedding consistency."
-
-        # Create embeddings multiple times
-        embedding1 = self.search_service._create_query_embedding(text)
-        embedding2 = self.search_service._create_query_embedding(text)
-
-        # Embeddings should be identical for the same text
-        assert embedding1 == embedding2, "Embeddings should be consistent for the same text"
-
-        # Verify embedding structure
-        assert isinstance(embedding1, list), f"Embedding should be a list, but it is {type(embedding1)}"
-        assert len(embedding1) == 1536, f"Embedding should have 1536 dimensions, but has {len(embedding1)}"
-        assert all(isinstance(x, (int, float)) for x in embedding1), "Embedding should contain numbers"
-
-    def test_cosine_similarity_quality(self):
-        """Test cosine similarity calculation with real embeddings"""
-        # Create embeddings for related and unrelated texts
-        related_text1 = "machine learning algorithms"
-        related_text2 = "artificial intelligence models"
-        unrelated_text = "cooking recipes and ingredients"
-
-        embedding1 = self.search_service._create_query_embedding(related_text1)
-        embedding2 = self.search_service._create_query_embedding(related_text2)
-        embedding3 = self.search_service._create_query_embedding(unrelated_text)
-
-        # Calculate similarities
-        related_similarity = self.search_service._cosine_similarity(embedding1, embedding2)
-        unrelated_similarity1 = self.search_service._cosine_similarity(embedding1, embedding3)
-        unrelated_similarity2 = self.search_service._cosine_similarity(embedding2, embedding3)
-
-        # Related texts should have higher similarity than unrelated texts
-        assert related_similarity > unrelated_similarity1, \
-            f"Related texts should have higher similarity: {related_similarity} > {unrelated_similarity1}"
-        assert related_similarity > unrelated_similarity2, \
-            f"Related texts should have higher similarity: {related_similarity} > {unrelated_similarity2}"
-
-        # Similarities should be reasonable values
-        assert 0.0 <= related_similarity <= 1.0, f"Related similarity should be between 0 and 1: {related_similarity}"
-        assert 0.0 <= unrelated_similarity1 <= 1.0, f"Unrelated similarity should be between 0 and 1: {unrelated_similarity1}"

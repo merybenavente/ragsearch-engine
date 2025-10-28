@@ -28,7 +28,7 @@ class TestHealthEndpoints:
     def test_root_endpoint(self):
         """Test root health check endpoint"""
         response = client.get("/")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["message"] == "Vector Database API is running"
@@ -36,7 +36,7 @@ class TestHealthEndpoints:
     def test_health_endpoint(self):
         """Test detailed health check endpoint"""
         response = client.get("/health")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
@@ -53,55 +53,122 @@ class TestLibraryEndpoints:
         library_data = {
             "name": "Test Library",
             "username": "testuser",
-            "tags": ["tag1", "tag2"]
+            "tags": ["tag1", "tag2"],
+            "index_type": "naive"
         }
-        
-        response = client.post("/api/v1/libraries/", json=library_data)
-        
+
+        response = client.post("/api/libraries", json=library_data)
+
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == library_data["name"]
         assert data["document_count"] == 0
         assert "id" in data
         assert "metadata" in data
+        assert data["metadata"]["username"] == library_data["username"]
+        assert data["metadata"]["tags"] == library_data["tags"]
 
     def test_create_library_minimal(self):
         """Test library creation with minimal data"""
         library_data = {"name": "Minimal Library"}
-        
-        response = client.post("/api/v1/libraries/", json=library_data)
-        
+
+        response = client.post("/api/libraries", json=library_data)
+
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == library_data["name"]
+        assert data["document_count"] == 0
+        assert data["metadata"]["username"] is None
+        assert data["metadata"]["tags"] == []
+
+    def test_create_document_success(self):
+        """Test successful document creation in a library"""
+        # First create a library
+        library_data = {"name": "Document Test Library"}
+        library_response = client.post("/api/libraries", json=library_data)
+        assert library_response.status_code == status.HTTP_201_CREATED
+        library_id = library_response.json()["id"]
+
+        # Then create a document
+        document_data = {
+            "text": "This is a test document with some content that will be chunked for vector search.",
+            "username": "testuser",
+            "tags": ["doc_tag"],
+            "chunk_size": 50
+        }
+
+        response = client.post(f"/api/libraries/{library_id}/documents", json=document_data)
+
+        if response.status_code != status.HTTP_201_CREATED:
+            print(f"Error: {response.status_code} - {response.text}")
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["library_id"] == library_id
+        assert data["chunk_count"] > 0
+        assert data["text_preview"].startswith("This is a test document")
+        assert data["metadata"]["username"] == document_data["username"]
+        assert data["metadata"]["tags"] == document_data["tags"]
+
+    def test_search_library(self):
+        """Test searching within a library"""
+        # Create library and document
+        library_data = {"name": "Search Test Library"}
+        library_response = client.post("/api/libraries", json=library_data)
+        library_id = library_response.json()["id"]
+
+        document_data = {
+            "text": "Machine learning algorithms are used in artificial intelligence applications."
+        }
+        client.post(f"/api/libraries/{library_id}/documents", json=document_data)
+
+        # Search for content
+        search_data = {
+            "query_text": "machine learning",
+            "k": 5,
+            "min_similarity": 0.0
+        }
+
+        response = client.post(f"/api/libraries/{library_id}/search", json=search_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["results"]) > 0
+
+        # Verify search result structure
+        for result in data["results"]:
+            assert "chunk" in result
+            assert "similarity_score" in result
+            assert isinstance(result["similarity_score"], float)
+            assert "id" in result["chunk"]
+            assert "text" in result["chunk"]
 
     def test_create_library_duplicate_name(self):
         """Test creating library with duplicate name"""
         library_data = {"name": "Duplicate Library"}
-        
+
         # Check current libraries first
-        response_check = client.get("/api/v1/libraries/")
-        
+        response_check = client.get("/api/libraries")
+
         # Create first library
-        response1 = client.post("/api/v1/libraries/", json=library_data)
+        response1 = client.post("/api/libraries", json=library_data)
         assert response1.status_code == status.HTTP_201_CREATED
-        
+
         # Try to create second library with same name
-        response2 = client.post("/api/v1/libraries/", json=library_data)
+        response2 = client.post("/api/libraries", json=library_data)
         assert response2.status_code == status.HTTP_409_CONFLICT
 
     def test_create_library_invalid_data(self):
         """Test library creation with invalid data"""
         invalid_data = {"name": ""}  # Empty name
-        
-        response = client.post("/api/v1/libraries/", json=invalid_data)
-        
+
+        response = client.post("/api/libraries", json=invalid_data)
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_get_libraries_empty(self):
         """Test getting libraries when none exist"""
-        response = client.get("/api/v1/libraries/")
-        
+        response = client.get("/api/libraries")
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert isinstance(data, list)
@@ -111,12 +178,12 @@ class TestLibraryEndpoints:
         """Test getting libraries when some exist"""
         # Create a library first
         library_data = {"name": "Test Library"}
-        create_response = client.post("/api/v1/libraries/", json=library_data)
+        create_response = client.post("/api/libraries", json=library_data)
         assert create_response.status_code == status.HTTP_201_CREATED
-        
+
         # Get all libraries
-        response = client.get("/api/v1/libraries/")
-        
+        response = client.get("/api/libraries")
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
@@ -126,13 +193,13 @@ class TestLibraryEndpoints:
         """Test getting library by ID successfully"""
         # Create a library first
         library_data = {"name": "Test Library"}
-        create_response = client.post("/api/v1/libraries/", json=library_data)
+        create_response = client.post("/api/libraries", json=library_data)
         created_library = create_response.json()
         library_id = created_library["id"]
-        
+
         # Get library by ID
-        response = client.get(f"/api/v1/libraries/{library_id}")
-        
+        response = client.get(f"/api/libraries/{library_id}")
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == library_id
@@ -141,26 +208,26 @@ class TestLibraryEndpoints:
     def test_get_library_by_id_not_found(self):
         """Test getting library by non-existent ID"""
         non_existent_id = str(uuid4())
-        
-        response = client.get(f"/api/v1/libraries/{non_existent_id}")
-        
+
+        response = client.get(f"/api/libraries/{non_existent_id}")
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_library_success(self):
         """Test successful library update"""
         # Create a library first
         library_data = {"name": "Original Library"}
-        create_response = client.post("/api/v1/libraries/", json=library_data)
+        create_response = client.post("/api/libraries", json=library_data)
         created_library = create_response.json()
         library_id = created_library["id"]
-        
+
         # Update library
         update_data = {
             "name": "Updated Library",
             "tags": ["new_tag"]
         }
-        response = client.put(f"/api/v1/libraries/{library_id}", json=update_data)
-        
+        response = client.put(f"/api/libraries/{library_id}", json=update_data)
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == update_data["name"]
@@ -169,9 +236,9 @@ class TestLibraryEndpoints:
         """Test updating non-existent library"""
         non_existent_id = str(uuid4())
         update_data = {"name": "Updated Library"}
-        
-        response = client.put(f"/api/v1/libraries/{non_existent_id}", json=update_data)
-        
+
+        response = client.put(f"/api/libraries/{non_existent_id}", json=update_data)
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_library_duplicate_name(self):
@@ -179,40 +246,40 @@ class TestLibraryEndpoints:
         # Create two libraries
         lib1_data = {"name": "Library 1"}
         lib2_data = {"name": "Library 2"}
-        
-        response1 = client.post("/api/v1/libraries/", json=lib1_data)
-        response2 = client.post("/api/v1/libraries/", json=lib2_data)
-        
+
+        response1 = client.post("/api/libraries", json=lib1_data)
+        response2 = client.post("/api/libraries", json=lib2_data)
+
         lib1_id = response1.json()["id"]
-        
+
         # Try to update lib1 with lib2's name
         update_data = {"name": "Library 2"}
-        response = client.put(f"/api/v1/libraries/{lib1_id}", json=update_data)
-        
+        response = client.put(f"/api/libraries/{lib1_id}", json=update_data)
+
         assert response.status_code == status.HTTP_409_CONFLICT
 
     def test_delete_library_success(self):
         """Test successful library deletion"""
         # Create a library first
         library_data = {"name": "To Delete Library"}
-        create_response = client.post("/api/v1/libraries/", json=library_data)
+        create_response = client.post("/api/libraries", json=library_data)
         library_id = create_response.json()["id"]
-        
+
         # Delete library
-        response = client.delete(f"/api/v1/libraries/{library_id}")
-        
+        response = client.delete(f"/api/libraries/{library_id}")
+
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        
+
         # Verify library is deleted
-        get_response = client.get(f"/api/v1/libraries/{library_id}")
+        get_response = client.get(f"/api/libraries/{library_id}")
         assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_library_not_found(self):
         """Test deleting non-existent library"""
         non_existent_id = str(uuid4())
-        
-        response = client.delete(f"/api/v1/libraries/{non_existent_id}")
-        
+
+        response = client.delete(f"/api/libraries/{non_existent_id}")
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -223,9 +290,9 @@ class TestDocumentEndpoints:
         """Test successful document creation"""
         # Create a library first
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         # Create document
         document_data = {
             "text": "This is a test document with some content.",
@@ -233,12 +300,12 @@ class TestDocumentEndpoints:
             "tags": ["doc_tag"],
             "chunk_size": 50
         }
-        
+
         response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
-        
+
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["library_id"] == library_id
@@ -250,49 +317,49 @@ class TestDocumentEndpoints:
         """Test creating document in non-existent library"""
         non_existent_library_id = str(uuid4())
         document_data = {"text": "Test content"}
-        
+
         response = client.post(
-            f"/api/v1/libraries/{non_existent_library_id}/documents/", 
+            f"/api/libraries/{non_existent_library_id}/documents",
             json=document_data
         )
-        
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_create_document_invalid_data(self):
         """Test creating document with invalid data"""
         # Create a library first
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         # Try to create document with empty text
         invalid_data = {"text": ""}
-        
+
         response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=invalid_data
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_get_documents_in_library(self):
         """Test getting documents in a library"""
         # Create a library
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         # Create a document
         document_data = {"text": "Test document content"}
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
         assert doc_response.status_code == status.HTTP_201_CREATED
-        
+
         # Get documents
-        response = client.get(f"/api/v1/libraries/{library_id}/documents/")
-        
+        response = client.get(f"/api/libraries/{library_id}/documents")
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) == 1
@@ -302,19 +369,19 @@ class TestDocumentEndpoints:
         """Test getting document by ID successfully"""
         # Create library and document
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         document_data = {"text": "Test document content"}
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
         document_id = doc_response.json()["id"]
-        
+
         # Get document by ID
-        response = client.get(f"/api/v1/libraries/{library_id}/documents/{document_id}")
-        
+        response = client.get(f"/api/documents/{document_id}")
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == document_id
@@ -324,39 +391,39 @@ class TestDocumentEndpoints:
         """Test getting document by non-existent ID"""
         # Create library
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         non_existent_doc_id = str(uuid4())
-        
-        response = client.get(f"/api/v1/libraries/{library_id}/documents/{non_existent_doc_id}")
-        
+
+        response = client.get(f"/api/documents/{non_existent_doc_id}")
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_document_success(self):
         """Test successful document update"""
         # Create library and document
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         document_data = {"text": "Original content"}
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
         document_id = doc_response.json()["id"]
-        
+
         # Update document
         update_data = {
             "text": "Updated content that is much longer than the original content.",
             "chunk_size": 30
         }
         response = client.put(
-            f"/api/v1/libraries/{library_id}/documents/{document_id}", 
+            f"/api/documents/{document_id}",
             json=update_data
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == document_id
@@ -365,294 +432,200 @@ class TestDocumentEndpoints:
         """Test successful document deletion"""
         # Create library and document
         library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         document_data = {"text": "To delete content"}
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
         document_id = doc_response.json()["id"]
-        
+
         # Delete document
-        response = client.delete(f"/api/v1/libraries/{library_id}/documents/{document_id}")
-        
+        response = client.delete(f"/api/documents/{document_id}")
+
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        
+
         # Verify document is deleted
-        get_response = client.get(f"/api/v1/libraries/{library_id}/documents/{document_id}")
+        get_response = client.get(f"/api/documents/{document_id}")
         assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
 
-class TestChunkEndpoints:
-    """Test cases for chunk endpoints"""
+class TestSearchEndpoints:
+    """Test cases for search endpoints"""
 
-    def test_get_chunks_in_library(self):
-        """Test getting chunks in a library"""
-        # Create library and document with content
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        document_data = {"text": "This is test content that should be chunked into multiple pieces."}
-        doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
-            json=document_data
-        )
-        assert doc_response.status_code == status.HTTP_201_CREATED
-        
-        # Get chunks
-        response = client.get(f"/api/v1/libraries/{library_id}/chunks/")
-        
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) > 0
-        assert all("text" in chunk for chunk in data)
-        assert all("embedding" in chunk for chunk in data)
-
-    def test_get_chunks_library_not_found(self):
-        """Test getting chunks from non-existent library"""
-        non_existent_library_id = str(uuid4())
-        
-        response = client.get(f"/api/v1/libraries/{non_existent_library_id}/chunks/")
-        
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    def test_get_chunk_by_id_success(self):
-        """Test getting chunk by ID successfully"""
-        # Create library, document, and get chunk ID
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        document_data = {"text": "Test content for chunking"}
-        doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
-            json=document_data
-        )
-        
-        # Get chunks to find a chunk ID
-        chunks_response = client.get(f"/api/v1/libraries/{library_id}/chunks/")
-        chunks = chunks_response.json()
-        chunk_id = chunks[0]["id"]
-        
-        # Get specific chunk
-        response = client.get(f"/api/v1/libraries/{library_id}/chunks/{chunk_id}")
-        
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["id"] == chunk_id
-
-    def test_get_chunk_by_id_not_found(self):
-        """Test getting chunk by non-existent ID"""
-        # Create library
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        non_existent_chunk_id = str(uuid4())
-        
-        response = client.get(f"/api/v1/libraries/{library_id}/chunks/{non_existent_chunk_id}")
-        
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    def test_get_document_chunks(self):
-        """Test getting chunks from a specific document"""
+    def test_search_document_success(self):
+        """Test successful document-specific search"""
         # Create library and document
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        library_data = {"name": "Document Search Library"}
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
-        document_data = {"text": "This is specific document content for chunk testing."}
+
+        document_data = {
+            "text": "This document contains information about machine learning algorithms and neural networks.",
+            "chunk_size": 30
+        }
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
         document_id = doc_response.json()["id"]
-        
-        # Get document chunks
-        response = client.get(
-            f"/api/v1/libraries/{library_id}/chunks/documents/{document_id}"
-        )
-        
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert len(data) > 0
-        assert all(chunk["document_id"] == document_id for chunk in data)
 
-    def test_get_document_chunks_document_not_found(self):
-        """Test getting chunks from non-existent document"""
-        # Create library
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        non_existent_document_id = str(uuid4())
-        
-        response = client.get(
-            f"/api/v1/libraries/{library_id}/chunks/documents/{non_existent_document_id}"
-        )
-        
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    def test_search_chunks_success(self):
-        """Test successful chunk search"""
-        # Create library and document with content
-        library_data = {"name": "Search Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        document_data = {
-            "text": "This is test content about machine learning and artificial intelligence.",
-            "chunk_size": 20
-        }
-        doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
-            json=document_data
-        )
-        assert doc_response.status_code == status.HTTP_201_CREATED
-        
-        # Perform search
+        # Search within the specific document
         search_data = {
-            "query_text": "machine learning artificial intelligence",
-            "k": 5
+            "query_text": "machine learning",
+            "k": 5,
+            "min_similarity": 0.0
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/documents/{document_id}/search", json=search_data)
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "results" in data
-        assert "total_chunks_searched" in data
-        assert "query_time_ms" in data
-        assert isinstance(data["results"], list)
-        assert data["total_chunks_searched"] > 0
-        assert data["query_time_ms"] > 0
+        assert len(data["results"]) > 0
 
-    def test_search_chunks_library_not_found(self):
-        """Test search in non-existent library"""
-        non_existent_library_id = str(uuid4())
+        # Verify all results are from the same document
+        for result in data["results"]:
+            assert result["chunk"]["document_id"] == document_id
+
+    def test_search_document_not_found(self):
+        """Test search in non-existent document"""
+        non_existent_document_id = str(uuid4())
         search_data = {
             "query_text": "test query",
             "k": 5
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{non_existent_library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/documents/{non_existent_document_id}/search", json=search_data)
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_search_chunks_empty_library(self):
-        """Test search in empty library"""
-        # Create empty library
-        library_data = {"name": "Empty Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+    def test_search_empty_document(self):
+        """Test search in document with no content"""
+        # Create library and empty document
+        library_data = {"name": "Empty Document Library"}
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
+        # Create empty document (no text)
+        document_data = {}
+        doc_response = client.post(
+            f"/api/libraries/{library_id}/documents",
+            json=document_data
+        )
+        document_id = doc_response.json()["id"]
+
+        # Search in empty document
         search_data = {
             "query_text": "test search",
             "k": 5
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/documents/{document_id}/search", json=search_data)
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["results"] == []
-        assert data["total_chunks_searched"] == 0
 
-    def test_search_chunks_invalid_embedding(self):
-        """Test search with invalid embedding"""
-        # Create library
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+    def test_search_validation_errors(self):
+        """Test search with various validation errors"""
+        # Create library and document
+        library_data = {"name": "Validation Test Library"}
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
-        # Invalid search data - empty text
+
+        # Test empty query text
         search_data = {
             "query_text": "",
             "k": 5
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/libraries/{library_id}/search", json=search_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_search_chunks_invalid_k(self):
-        """Test search with invalid k value"""
-        # Create library
-        library_data = {"name": "Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
-        library_id = lib_response.json()["id"]
-        
-        # Invalid k value (too high)
+        # Test invalid k value (too high)
         search_data = {
             "query_text": "test query",
             "k": 500  # Exceeds max of 100
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/libraries/{library_id}/search", json=search_data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_search_chunks_response_structure(self):
-        """Test search response structure is correct"""
+        # Test invalid k value (zero)
+        search_data = {
+            "query_text": "test query",
+            "k": 0
+        }
+
+        response = client.post(f"/api/libraries/{library_id}/search", json=search_data)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_search_response_structure_comprehensive(self):
+        """Test comprehensive search response structure validation"""
         # Create library and document
         library_data = {"name": "Structure Test Library"}
-        lib_response = client.post("/api/v1/libraries/", json=library_data)
+        lib_response = client.post("/api/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
-        document_data = {"text": "Test content for structure validation."}
+
+        document_data = {
+            "text": "Test content for comprehensive structure validation with multiple sentences.",
+            "username": "test_user",
+            "tags": ["test", "validation"],
+            "chunk_size": 25
+        }
         doc_response = client.post(
-            f"/api/v1/libraries/{library_id}/documents/", 
+            f"/api/libraries/{library_id}/documents",
             json=document_data
         )
-        
+
         # Perform search
         search_data = {
             "query_text": "test content validation",
-            "k": 3
+            "k": 3,
+            "min_similarity": 0.0
         }
-        
-        response = client.post(
-            f"/api/v1/libraries/{library_id}/chunks/search",
-            json=search_data
-        )
-        
+
+        response = client.post(f"/api/libraries/{library_id}/search", json=search_data)
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        
-        # Validate response structure
+
+        # Validate top-level response structure
         assert "results" in data
         assert "total_chunks_searched" in data
         assert "query_time_ms" in data
-        
+        assert isinstance(data["results"], list)
+        assert isinstance(data["total_chunks_searched"], int)
+        assert isinstance(data["query_time_ms"], float)
+
+        # Validate individual result structure
         if data["results"]:
             result = data["results"][0]
             assert "chunk" in result
             assert "similarity_score" in result
-            
+            assert isinstance(result["similarity_score"], float)
+
             chunk = result["chunk"]
             assert "id" in chunk
             assert "document_id" in chunk
             assert "text" in chunk
             assert "embedding" in chunk
             assert "metadata" in chunk
+
+            # Validate chunk metadata structure
+            metadata = chunk["metadata"]
+            assert "creation_time" in metadata
+            assert "last_update" in metadata
+            assert "username" in metadata
+            assert "tags" in metadata
+            assert metadata["username"] == "test_user"
+            assert metadata["tags"] == ["test", "validation"]
+
+            # Validate embedding structure
+            assert isinstance(chunk["embedding"], list)
+            assert len(chunk["embedding"]) == 1536  # Standard embedding dimension
 
 
 class TestErrorHandling:
@@ -661,26 +634,26 @@ class TestErrorHandling:
     def test_invalid_json(self):
         """Test sending invalid JSON"""
         response = client.post(
-            "/api/v1/libraries/",
+            "/api/libraries",
             content="invalid json",
             headers={"Content-Type": "application/json"}
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_missing_content_type(self):
         """Test sending data without proper content type"""
         response = client.post(
-            "/api/v1/libraries/",
+            "/api/libraries",
             content='{"name": "Test"}',
             headers={"Content-Type": "text/plain"}
         )
-        
+
         # Should still work with FastAPI's automatic parsing
         assert response.status_code in [status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_201_CREATED]
 
     def test_nonexistent_endpoint(self):
         """Test accessing non-existent endpoint"""
-        response = client.get("/api/v1/nonexistent/")
-        
+        response = client.get("/api/nonexistent/")
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
