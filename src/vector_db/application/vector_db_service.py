@@ -49,6 +49,11 @@ class VectorDBService:
         index_type: str = "naive"
     ) -> Library:
         """Create a new library with search index"""
+        # Check for duplicate names
+        existing_libraries = self.library_repo.list_all()
+        if any(lib.name == name for lib in existing_libraries):
+            raise ValueError(f"Library with name '{name}' already exists")
+            
         library = Library.create(name, username, tags, index_type)
         
         # Persist library
@@ -76,6 +81,12 @@ class VectorDBService:
     ) -> Library:
         """Update library metadata"""
         library = self._ensure_library_exists(library_id)
+        
+        # Check for duplicate names (if name is being updated)
+        if name and name != library.name:
+            existing_libraries = self.library_repo.list_all()
+            if any(lib.name == name and lib.id != library_id for lib in existing_libraries):
+                raise ValueError(f"Library with name '{name}' already exists")
         
         updated_library = library.update_metadata(name, tags)
         self.library_repo.save(updated_library)
@@ -123,7 +134,7 @@ class VectorDBService:
         
         # Create chunks with embeddings if text provided (application layer responsibility)
         if text:
-            chunks = self._create_chunks_from_text(document.id, text, chunk_size)
+            chunks = self._create_chunks_from_text(document.id, text, chunk_size, document.metadata)
             document = document.update_chunks(chunks)
         
         try:
@@ -198,7 +209,7 @@ class VectorDBService:
         
         # Create new chunks with embeddings (application layer responsibility)
         old_chunk_count = len(document.chunks)
-        new_chunks = self._create_chunks_from_text(document.id, new_text, chunk_size) if new_text else []
+        new_chunks = self._create_chunks_from_text(document.id, new_text, chunk_size, document.metadata) if new_text else []
         
         # Update document with new chunks (domain logic)
         updated_document = document.update_chunks(new_chunks)
@@ -330,9 +341,13 @@ class VectorDBService:
         logger.debug("Retrieved chunks from library", lib_id=library_id, count=len(chunks))
         return chunks
     
-    def _create_chunks_from_text(self, document_id: DocumentID, text: str, chunk_size: int = 500) -> List[Chunk]:
+    def _create_chunks_from_text(self, document_id: DocumentID, text: str, chunk_size: int = 500, metadata=None) -> List[Chunk]:
         """Create chunks from text with embeddings (application layer logic)"""
-        from ..domain.models import Chunk  # Import here to avoid circular imports
+        from ..domain.models import Chunk, Metadata  # Import here to avoid circular imports
+        
+        # Use provided metadata or create default
+        if metadata is None:
+            metadata = Metadata()
         
         chunks = []
         
@@ -345,7 +360,8 @@ class VectorDBService:
                 chunk = Chunk(
                     document_id=document_id,
                     text=chunk_text,
-                    embedding=embedding
+                    embedding=embedding,
+                    metadata=metadata  # Inherit document metadata
                 )
                 chunks.append(chunk)
         
