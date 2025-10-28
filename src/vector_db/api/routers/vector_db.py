@@ -1,8 +1,8 @@
 """
-New DDD-style API router using VectorDBService.
+Vector Database API router using VectorDBService.
 
-This router demonstrates the clean architecture approach with a single
-orchestrating service that coordinates all operations.
+This router provides a clean REST API for vector database operations
+including libraries, documents, and similarity search.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
@@ -16,15 +16,17 @@ from ..schemas import (
     DocumentResponse,
     SearchRequest,
     SearchResponse,
+    SearchResult,
+    ChunkResponse,
     MetadataResponse
 )
 from ..dependencies import get_vector_db_service
 from ...application.vector_db_service import VectorDBService
-from ...domain.models import LibraryID, DocumentID, ChunkID
+from ...domain.models import LibraryID, DocumentID
 from ...infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/v2", tags=["vector-db-v2"])
+router = APIRouter(tags=["vector-db"])
 
 
 def _to_library_response(library) -> LibraryResponse:
@@ -44,23 +46,12 @@ def _to_library_response(library) -> LibraryResponse:
 
 def _to_document_response(document) -> DocumentResponse:
     """Convert domain Document to DocumentResponse"""
+    full_text = document.get_full_text()
     return DocumentResponse(
         id=document.id,
         library_id=document.library_id,
-        chunks=[
-            {
-                "id": chunk.id,
-                "text": chunk.text,
-                "embedding": chunk.embedding,
-                "metadata": {
-                    "creation_time": chunk.metadata.creation_time,
-                    "last_update": chunk.metadata.last_update,
-                    "username": chunk.metadata.username,
-                    "tags": chunk.metadata.tags,
-                }
-            }
-            for chunk in document.chunks
-        ],
+        chunk_count=len(document.chunks),
+        text_preview=full_text[:200] if full_text else "",
         metadata=MetadataResponse(
             creation_time=document.metadata.creation_time,
             last_update=document.metadata.last_update,
@@ -87,6 +78,12 @@ async def create_library(
         )
         return _to_library_response(library)
     except ValueError as e:
+        # Check if this is a duplicate name error
+        if "already exists" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(e),
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
@@ -154,8 +151,20 @@ async def update_library(
         )
         return _to_library_response(updated_library)
     except ValueError as e:
+        # Check if this is a duplicate name error
+        if "already exists" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(e),
+            )
+        # Check if this is a not found error
+        if "not found" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
     except Exception as e:
@@ -213,6 +222,12 @@ async def create_document(
             )
         return _to_document_response(document)
     except ValueError as e:
+        # Check if this is a library not found error
+        if "not found" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(e),
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
@@ -326,32 +341,31 @@ async def search_library(
     try:
         results = vector_db.search_library(
             library_id=library_id,
-            query_text=request.query,
+            query_text=request.query_text,
             k=request.k,
             min_similarity=request.min_similarity,
         )
-        
         return SearchResponse(
-            query=request.query,
             results=[
-                {
-                    "chunk": {
-                        "id": chunk.id,
-                        "document_id": chunk.document_id,
-                        "text": chunk.text,
-                        "embedding": chunk.embedding,
-                        "metadata": {
-                            "creation_time": chunk.metadata.creation_time,
-                            "last_update": chunk.metadata.last_update,
-                            "username": chunk.metadata.username,
-                            "tags": chunk.metadata.tags,
-                        }
-                    },
-                    "similarity": similarity
-                }
+                SearchResult(
+                    chunk=ChunkResponse(
+                        id=chunk.id,
+                        document_id=chunk.document_id,
+                        text=chunk.text,
+                        embedding=chunk.embedding,
+                        metadata=MetadataResponse(
+                            creation_time=chunk.metadata.creation_time,
+                            last_update=chunk.metadata.last_update,
+                            username=chunk.metadata.username,
+                            tags=chunk.metadata.tags,
+                        )
+                    ),
+                    similarity_score=similarity
+                )
                 for chunk, similarity in results
             ],
-            total_results=len(results)
+            total_chunks_searched=len(results),
+            query_time_ms=0.0  # TODO: Add actual timing
         )
     except ValueError as e:
         raise HTTPException(
@@ -376,32 +390,31 @@ async def search_document(
     try:
         results = vector_db.search_document(
             document_id=document_id,
-            query_text=request.query,
+            query_text=request.query_text,
             k=request.k,
             min_similarity=request.min_similarity,
         )
-        
         return SearchResponse(
-            query=request.query,
             results=[
-                {
-                    "chunk": {
-                        "id": chunk.id,
-                        "document_id": chunk.document_id,
-                        "text": chunk.text,
-                        "embedding": chunk.embedding,
-                        "metadata": {
-                            "creation_time": chunk.metadata.creation_time,
-                            "last_update": chunk.metadata.last_update,
-                            "username": chunk.metadata.username,
-                            "tags": chunk.metadata.tags,
-                        }
-                    },
-                    "similarity": similarity
-                }
+                SearchResult(
+                    chunk=ChunkResponse(
+                        id=chunk.id,
+                        document_id=chunk.document_id,
+                        text=chunk.text,
+                        embedding=chunk.embedding,
+                        metadata=MetadataResponse(
+                            creation_time=chunk.metadata.creation_time,
+                            last_update=chunk.metadata.last_update,
+                            username=chunk.metadata.username,
+                            tags=chunk.metadata.tags,
+                        )
+                    ),
+                    similarity_score=similarity
+                )
                 for chunk, similarity in results
             ],
-            total_results=len(results)
+            total_chunks_searched=len(results),
+            query_time_ms=0.0  # TODO: Add actual timing
         )
     except ValueError as e:
         raise HTTPException(
