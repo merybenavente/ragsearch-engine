@@ -35,10 +35,9 @@ def mock_logger():
 @pytest.fixture(autouse=True)
 def reset_repositories():
     """Reset repository state between tests"""
-    # Clear the singleton repository instances
-    from src.vector_db.api.dependencies import _library_repo
-    if hasattr(_library_repo, '_libraries'):
-        _library_repo._libraries.clear()
+    # Clear the singleton repository instances using the new architecture
+    from src.vector_db.api.dependencies import clear_all_data
+    clear_all_data()
     yield
 
 
