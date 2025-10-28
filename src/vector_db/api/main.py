@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import structlog
 
-from .routers import libraries, documents, chunks, vector_db
+from .routers import vector_db
 from ..infrastructure.logging import configure_logging, get_logger
 
 # Configure logging
@@ -25,12 +24,6 @@ app.add_middleware(
 )
 
 # Include routers
-# Legacy v1 API
-app.include_router(libraries.router, prefix="/api/v1")
-app.include_router(documents.router, prefix="/api/v1")
-app.include_router(chunks.router, prefix="/api/v1")
-
-# New DDD v2 API (recommended)
 app.include_router(vector_db.router, prefix="/api")
 
 
@@ -50,12 +43,9 @@ async def health_check():
         "service": "vector-db",
         "version": "0.1.0",
         "endpoints": {
-            "v1_libraries": "/api/v1/libraries",
-            "v1_documents": "/api/v1/libraries/{library_id}/documents",
-            "v1_chunks": "/api/v1/libraries/{library_id}/chunks",
-            "v2_libraries": "/api/v2/libraries",
-            "v2_documents": "/api/v2/libraries/{library_id}/documents",
-            "v2_search": "/api/v2/libraries/{library_id}/search"
+            "libraries": "/api/libraries",
+            "documents": "/api/libraries/{library_id}/documents",
+            "search": "/api/libraries/{library_id}/search"
         }
     }
 
@@ -75,4 +65,3 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

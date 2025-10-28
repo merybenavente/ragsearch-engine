@@ -38,7 +38,7 @@ class LibraryResponse(BaseModel):
 
 class CreateDocumentRequest(BaseModel):
     """Request schema for creating a document"""
-    text: Optional[str] = Field(None, description="Document content (optional for empty document)")
+    text: Optional[str] = Field(None, min_length=1, description="Document content (optional for empty document)")
     username: Optional[str] = Field(None, description="Username")
     tags: List[str] = Field(default_factory=list, description="Tags")
     chunk_size: int = Field(default=500, ge=1, le=2000, description="Chunk size for splitting")
@@ -72,6 +72,7 @@ class SearchRequest(BaseModel):
     """Request schema for vector search"""
     query_text: str = Field(..., min_length=1, description="Query text for similarity search")
     k: int = Field(default=10, ge=1, le=100, description="Number of results to return")
+    min_similarity: float = Field(default=0.0, ge=0.0, le=1.0, description="Minimum similarity threshold")
 
 
 class SearchResult(BaseModel):
