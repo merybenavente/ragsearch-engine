@@ -21,7 +21,7 @@ class Metadata(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
     def update_timestamp(self) -> 'Metadata':
-        """Return a copy with updated timestamp"""
+        """Return a copy with updated last_update timestamp, preserving all other fields"""
         return self.model_copy(update={'last_update': datetime.now()})
 
 
