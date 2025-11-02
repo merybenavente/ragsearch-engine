@@ -57,14 +57,14 @@ class RepositoryAwareSearchIndex(SearchIndex):
             if old_library_id and old_library_id != document.library_id:
                 # Document moved between libraries - remove from old library index
                 logger.info("Document moved between libraries", doc_id=document.id, old_lib=old_library_id, new_lib=document.library_id)
-                # Note: calling remove_document here could cause deadlock, so we handle it inline
-                del self._document_library_mapping[document.id]
+                old_index = self._get_library_index(old_library_id)
+                old_index.remove_document(document.id)
             
             self._document_library_mapping[document.id] = document.library_id
             
-            # Get library index and index chunks
+            # Get library index and add document chunks
             index = self._get_library_index(document.library_id)
-            index.index_chunks(document.chunks)
+            index.add_chunks(document.id, document.chunks)
             
             logger.debug("Document indexed", doc_id=document.id, lib_id=document.library_id, chunk_count=len(document.chunks))
     
@@ -77,87 +77,27 @@ class RepositoryAwareSearchIndex(SearchIndex):
             
             library_id = self._document_library_mapping[document_id]
             
-            # For proper chunk removal, we need to know which chunks to remove
-            # Since the SearchIndex interface doesn't provide chunk access,
-            # we'll implement a simplified approach where we let the index
-            # handle cleanup internally
-            
-            # Note: This is a design limitation - ideally the SearchIndex would
-            # maintain its own chunk mappings or the VectorIndex would support
-            # document-based removal
+            # Remove document from the vector index
+            index = self._get_library_index(library_id)
+            index.remove_document(document_id)
             
             # Remove from mapping
             del self._document_library_mapping[document_id]
-            logger.debug("Document removed from mapping", doc_id=document_id, lib_id=library_id)
-            
-            # Log the limitation
-            logger.warning("Document chunks may remain in index - design limitation", doc_id=document_id)
+            logger.debug("Document removed", doc_id=document_id, lib_id=library_id)
     
     def search_chunks(
         self,
-        chunks: List[Chunk],
+        library_id: LibraryID,
         query_embedding: List[float],
         k: int = 10,
         min_similarity: float = 0.0
     ) -> List[Tuple[Chunk, float]]:
-        """Search for similar chunks within the provided chunk list"""
-        if not chunks:
-            logger.debug("No chunks provided for search")
-            return []
-        
+        """Search for similar chunks within the specified library"""
         with self._lock:
-            # Determine which library index to use based on first chunk's document
-            # All chunks should belong to documents in the same library for this to work properly
-            first_chunk = chunks[0]
-            library_id = self._document_library_mapping.get(first_chunk.document_id)
-            
-            if not library_id:
-                # Fallback to naive search if no library mapping exists
-                logger.warning("No library mapping found, using naive search", doc_id=first_chunk.document_id)
-                return self._naive_search(chunks, query_embedding, k, min_similarity)
-            
-            # Use the library's index
+            # Get the library's index
             index = self._get_library_index(library_id)
-            results = index.search(chunks, query_embedding, k, min_similarity)
+            results = index.search(query_embedding, k, min_similarity)
             
-            logger.debug("Chunk search completed", chunk_count=len(chunks), results_count=len(results))
+            logger.debug("Chunk search completed", lib_id=library_id, results_count=len(results))
             return results
     
-    def _naive_search(
-        self,
-        chunks: List[Chunk],
-        query_embedding: List[float], 
-        k: int,
-        min_similarity: float
-    ) -> List[Tuple[Chunk, float]]:
-        """Fallback naive search implementation"""
-        import numpy as np
-        
-        results = []
-        for chunk in chunks:
-            if not chunk.embedding:
-                continue
-            
-            # Calculate cosine similarity
-            v1 = np.array(query_embedding)
-            v2 = np.array(chunk.embedding)
-            
-            if len(v1) != len(v2):
-                continue
-                
-            dot_product = np.dot(v1, v2)
-            norm_v1 = np.linalg.norm(v1)
-            norm_v2 = np.linalg.norm(v2)
-            
-            if norm_v1 == 0 or norm_v2 == 0:
-                continue
-                
-            similarity = dot_product / (norm_v1 * norm_v2)
-            similarity = max(0.0, min(1.0, similarity))  # Clamp to [0,1]
-            
-            if similarity >= min_similarity:
-                results.append((chunk, similarity))
-        
-        # Sort by similarity and return top k
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:k]

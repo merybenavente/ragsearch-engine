@@ -11,21 +11,19 @@ if TYPE_CHECKING:
 class NaiveIndex(BaseVectorIndex):
     """Naive implementation using linear search with cosine similarity"""
     
-    def _index_chunks_impl(self, chunks: List['Chunk']) -> None:
-        """Store chunks in memory for linear search"""
-        for chunk in chunks:
-            self._chunks[chunk.id] = chunk
+    def _add_chunks_impl(self, chunks: List['Chunk']) -> None:
+        """Store chunks in memory for linear search - already handled by base class"""
+        pass
     
     def _remove_chunks_impl(self, chunk_ids: List[str]) -> None:
-        """Remove chunks from index"""
-        for chunk_id in chunk_ids:
-            self._chunks.pop(chunk_id, None)
+        """Remove chunks from index - already handled by base class"""
+        pass
     
-    def _search_impl(self, chunks: List['Chunk'], query_embedding: List[float], k: int, min_similarity: float) -> List[Tuple['Chunk', float]]:
+    def _search_impl(self, query_embedding: List[float], k: int, min_similarity: float) -> List[Tuple['Chunk', float]]:
         """Search using linear search with cosine similarity"""
         similarities = []
         
-        for chunk in chunks:
+        for chunk in self._chunks.values():
             if not chunk.embedding:
                 continue
                 

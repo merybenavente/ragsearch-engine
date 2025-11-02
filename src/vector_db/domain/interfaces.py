@@ -29,32 +29,32 @@ class VectorIndex(ABC):
     """Abstract interface for vector indexes"""
     
     @abstractmethod
-    def index_chunks(self, chunks: List['Chunk']) -> None:
+    def add_chunks(self, document_id: DocumentID, chunks: List['Chunk']) -> None:
         """
-        Index a list of chunks for efficient search.
+        Add chunks from a document to the index.
         
         Args:
+            document_id: ID of the document containing these chunks
             chunks: List of chunks to index
         """
         pass
     
     @abstractmethod
-    def remove_chunks(self, chunk_ids: List[str]) -> None:
+    def remove_document(self, document_id: DocumentID) -> None:
         """
-        Remove chunks from the index.
+        Remove all chunks belonging to a document from the index.
         
         Args:
-            chunk_ids: List of chunk IDs to remove
+            document_id: ID of the document to remove
         """
         pass
     
     @abstractmethod
-    def search(self, chunks: List['Chunk'], query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple['Chunk', float]]:
+    def search(self, query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple['Chunk', float]]:
         """
-        Search for the k most similar chunks to the query within the given chunks.
+        Search for the k most similar chunks to the query across all indexed chunks.
         
         Args:
-            chunks: List of chunks to search through
             query_embedding: Query embedding vector
             k: Number of results to return
             min_similarity: Minimum similarity threshold (0.0 to 1.0)
@@ -62,6 +62,32 @@ class VectorIndex(ABC):
         Returns:
             List of (chunk, similarity_score) tuples ordered by similarity
         """
+        pass
+    
+    @abstractmethod
+    def get_document_chunks(self, document_id: DocumentID) -> List['Chunk']:
+        """
+        Get all chunks for a specific document.
+        
+        Args:
+            document_id: ID of the document
+            
+        Returns:
+            List of chunks belonging to the document
+        """
+        pass
+    
+    def __contains__(self, document_id: DocumentID) -> bool:
+        """Check if a document is indexed"""
+        return len(self.get_document_chunks(document_id)) > 0
+    
+    def __len__(self) -> int:
+        """Get total number of indexed chunks"""
+        return len(self._get_all_chunks())
+    
+    @abstractmethod
+    def _get_all_chunks(self) -> List['Chunk']:
+        """Get all indexed chunks - for len() implementation"""
         pass
 
 
@@ -137,8 +163,8 @@ class SearchIndex(ABC):
         pass
     
     @abstractmethod
-    def search_chunks(self, chunks: List[Chunk], query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple[Chunk, float]]:
-        """Search for similar chunks within the provided chunk list"""
+    def search_chunks(self, library_id: LibraryID, query_embedding: List[float], k: int = 10, min_similarity: float = 0.0) -> List[Tuple[Chunk, float]]:
+        """Search for similar chunks within the specified library"""
         pass
     
     @abstractmethod

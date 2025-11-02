@@ -12,6 +12,7 @@ from ..domain.interfaces import (
     SearchIndex, 
     EmbeddingService
 )
+from .document_indexing_service import DocumentIndexingService
 from ..infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +39,12 @@ class VectorDBService:
         self.library_repo = library_repository
         self.search_index = search_index
         self.embedding_service = embedding_service
+    
+    def _get_document_indexing_service(self, library_id: LibraryID) -> DocumentIndexingService:
+        """Get a DocumentIndexingService for a specific library"""
+        library_index = self.search_index._get_library_index(library_id)
+        return DocumentIndexingService(library_index, self.embedding_service)
+        
     
     # Library Operations
     
@@ -100,9 +107,10 @@ class VectorDBService:
         
         # Delete all documents in the library
         documents = self.document_repo.get_by_library(library_id)
+        indexing_service = self._get_document_indexing_service(library_id)
         for document in documents:
             # Remove from search index first (while we still have access to chunks)
-            self.search_index.remove_document(document.id)
+            indexing_service.remove_document(document.id)
             # Then delete from repository
             self.document_repo.delete(document.id)
         
@@ -145,11 +153,33 @@ class VectorDBService:
             updated_library = library.add_document_reference(document.id)
             self.library_repo.save(updated_library)
             
-            # Index document for search
-            self.search_index.index_document(document)
+            # Index document for search using DocumentIndexingService
+            indexing_service = self._get_document_indexing_service(library_id)
             
-            logger.info("Document created", doc_id=document.id, lib_id=library_id, chunks=len(document.chunks))
-            return document
+            # Create chunks with embeddings
+            chunks_with_embeddings = []
+            for chunk in document.chunks:
+                if not chunk.embedding:
+                    embedding = self.embedding_service.create_embedding(
+                        chunk.text, 
+                        input_type="search_document"
+                    )
+                    chunk_with_embedding = chunk.model_copy(update={'embedding': embedding})
+                    chunks_with_embeddings.append(chunk_with_embedding)
+                else:
+                    chunks_with_embeddings.append(chunk)
+            
+            # Update document with chunks that have embeddings
+            document_with_embeddings = document.update_chunks(chunks_with_embeddings)
+            
+            # Save the updated document
+            self.document_repo.save(document_with_embeddings)
+            
+            # Index the document
+            indexing_service.index_document(document_with_embeddings)
+            
+            logger.info("Document created", doc_id=document.id, lib_id=library_id, chunks=len(document_with_embeddings.chunks))
+            return document_with_embeddings
             
         except Exception as e:
             # Rollback: Try to clean up any partial state
@@ -217,12 +247,31 @@ class VectorDBService:
         # Persist changes
         self.document_repo.save(updated_document)
         
-        # Re-index document (remove old + add new)
-        self.search_index.remove_document(document_id)
-        self.search_index.index_document(updated_document)
+        # Create chunks with embeddings
+        chunks_with_embeddings = []
+        for chunk in updated_document.chunks:
+            if not chunk.embedding:
+                embedding = self.embedding_service.create_embedding(
+                    chunk.text, 
+                    input_type="search_document"
+                )
+                chunk_with_embedding = chunk.model_copy(update={'embedding': embedding})
+                chunks_with_embeddings.append(chunk_with_embedding)
+            else:
+                chunks_with_embeddings.append(chunk)
         
-        logger.info("Document updated", doc_id=document_id, chunks=f"{old_chunk_count}→{len(updated_document.chunks)}")
-        return updated_document
+        # Update document with chunks that have embeddings
+        final_document = updated_document.update_chunks(chunks_with_embeddings)
+        
+        # Save the final document
+        self.document_repo.save(final_document)
+        
+        # Re-index document using DocumentIndexingService
+        indexing_service = self._get_document_indexing_service(document.library_id)
+        indexing_service.index_document(final_document)
+        
+        logger.info("Document updated", doc_id=document_id, chunks=f"{old_chunk_count}→{len(final_document.chunks)}")
+        return final_document
     
     def delete_document(self, document_id: DocumentID) -> None:
         """Delete a document and remove from library"""
@@ -230,8 +279,9 @@ class VectorDBService:
         if not document:
             raise ValueError(f"Document {document_id} not found")
         
-        # Remove from search index first (while we still have access to chunks)
-        self.search_index.remove_document(document_id)
+        # Remove from search index using DocumentIndexingService
+        indexing_service = self._get_document_indexing_service(document.library_id)
+        indexing_service.remove_document(document_id)
         
         # Remove from library membership
         library = self.library_repo.get(document.library_id)
@@ -263,21 +313,11 @@ class VectorDBService:
         if not library:
             raise ValueError(f"Library {library_id} not found")
         
-        # Get all chunks from library documents
-        documents = self.document_repo.get_by_library(library_id)
-        chunks = []
-        for document in documents:
-            chunks.extend(document.chunks)
-        
-        if not chunks:
-            logger.debug("No chunks found in library", lib_id=library_id)
-            return []
-        
         # Create query embedding
         query_embedding = self.embedding_service.create_embedding(query_text, input_type="search_query")
         
         # Search using index
-        results = self.search_index.search_chunks(chunks, query_embedding, k, min_similarity)
+        results = self.search_index.search_chunks(library_id, query_embedding, k, min_similarity)
         
         logger.info("Library search completed", lib_id=library_id, results_count=len(results))
         return results
@@ -302,8 +342,19 @@ class VectorDBService:
         # Create query embedding
         query_embedding = self.embedding_service.create_embedding(query_text, input_type="search_query")
         
-        # Search using index
-        results = self.search_index.search_chunks(document.chunks, query_embedding, k, min_similarity)
+        # Get document chunks from the indexing service for this library
+        indexing_service = self._get_document_indexing_service(document.library_id)
+        document_chunks = indexing_service.get_document_chunks(document_id)
+        
+        if not document_chunks:
+            logger.debug("No indexed chunks found for document", doc_id=document_id)
+            return []
+        
+        # Search across all chunks in the library but then filter by document
+        all_results = self.search_index.search_chunks(document.library_id, query_embedding, k * 5, min_similarity)
+        
+        # Filter results to only include chunks from this document
+        results = [(chunk, score) for chunk, score in all_results if chunk.document_id == document_id][:k]
         
         logger.info("Document search completed", doc_id=document_id, results_count=len(results))
         return results
@@ -354,13 +405,10 @@ class VectorDBService:
         for i in range(0, len(text), chunk_size):
             chunk_text = text[i:i + chunk_size]
             if chunk_text:  # Only create non-empty chunks
-                # Generate embedding for this chunk
-                embedding = self.embedding_service.create_embedding(chunk_text)
-                
                 chunk = Chunk(
                     document_id=document_id,
                     text=chunk_text,
-                    embedding=embedding,
+                    embedding=[],  # Will be populated by DocumentIndexingService
                     metadata=metadata  # Inherit document metadata
                 )
                 chunks.append(chunk)
