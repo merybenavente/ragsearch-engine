@@ -389,6 +389,9 @@ async def search_library(
         )
         query_time_ms = (time.time() - start_time) * 1000
         
+        # Get total chunks in library for accurate reporting
+        total_chunks = len(vector_db.get_chunks_from_library(library_id))
+        
         return SearchResponse(
             results=[
                 SearchResult(
@@ -407,7 +410,7 @@ async def search_library(
                 )
                 for chunk, similarity in results
             ],
-            total_chunks_searched=len(results),
+            total_chunks_searched=total_chunks,
             query_time_ms=query_time_ms
         )
     except ValueError as e:
@@ -454,6 +457,9 @@ async def search_document(
         )
         query_time_ms = (time.time() - start_time) * 1000
         
+        # Get total chunks in document for accurate reporting
+        total_chunks = len(vector_db.get_chunks_from_document(document_id))
+        
         return SearchResponse(
             results=[
                 SearchResult(
@@ -473,7 +479,7 @@ async def search_document(
                 )
                 for chunk, similarity in results
             ],
-            total_chunks_searched=len(results),
+            total_chunks_searched=total_chunks,
             query_time_ms=query_time_ms
         )
     except HTTPException:
