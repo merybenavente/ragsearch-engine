@@ -97,13 +97,9 @@ Once running, visit:
 - `PUT /api/v1/libraries/{library_id}/documents/{document_id}` - Update document
 - `DELETE /api/v1/libraries/{library_id}/documents/{document_id}` - Delete document
 
-#### Chunks
-- `GET /api/v1/libraries/{library_id}/chunks/` - List all chunks in library
-- `GET /api/v1/libraries/{library_id}/chunks/{chunk_id}` - Get specific chunk
-- `GET /api/v1/libraries/{library_id}/chunks/documents/{document_id}` - Get document chunks
-
 #### Search
-- `POST /api/v1/libraries/{library_id}/chunks/search` - Perform text-based similarity search across chunks in a library
+- `POST /api/v1/libraries/{library_id}/search` - Perform text-based similarity search across chunks in a library
+- `POST /api/v1/libraries/{library_id}/documents/{document_id}/search` - Perform text-based similarity search within a specific document
 
 **Request Body**:
 ```json
@@ -165,7 +161,16 @@ curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/" \
 
 ### Search for Similar Content
 ```bash
-curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/chunks/search" \
+# Search within a library
+curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query_text": "machine learning neural networks",
+    "k": 5
+  }'
+
+# Search within a specific document
+curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/{document_id}/search" \
   -H "Content-Type: application/json" \
   -d '{
     "query_text": "machine learning neural networks",

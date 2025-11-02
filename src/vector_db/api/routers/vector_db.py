@@ -257,8 +257,9 @@ async def get_documents_in_library(
         )
 
 
-@router.get("/documents/{document_id}", response_model=DocumentResponse)
+@router.get("/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse)
 async def get_document(
+    library_id: LibraryID,
     document_id: DocumentID,
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
@@ -269,6 +270,12 @@ async def get_document(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Document with ID '{document_id}' not found",
+            )
+        # Verify document belongs to the specified library
+        if document.library_id != library_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
             )
         return _to_document_response(document)
     except HTTPException:
@@ -281,20 +288,36 @@ async def get_document(
         )
 
 
-@router.put("/documents/{document_id}", response_model=DocumentResponse)
+@router.put("/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse)
 async def update_document(
+    library_id: LibraryID,
     document_id: DocumentID,
     request: UpdateDocumentRequest,
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
     """Update document content"""
     try:
+        # First verify document exists and belongs to the specified library
+        document = vector_db.get_document(document_id)
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found",
+            )
+        if document.library_id != library_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
+            )
+        
         updated_document = vector_db.update_document_content(
             document_id=document_id,
             new_text=request.text,
             chunk_size=request.chunk_size  # Now properly defined in schema
         )
         return _to_document_response(updated_document)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -308,14 +331,30 @@ async def update_document(
         )
 
 
-@router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/libraries/{library_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
+    library_id: LibraryID,
     document_id: DocumentID,
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
     """Delete a document"""
     try:
+        # First verify document exists and belongs to the specified library
+        document = vector_db.get_document(document_id)
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found",
+            )
+        if document.library_id != library_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
+            )
+        
         vector_db.delete_document(document_id)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -380,14 +419,28 @@ async def search_library(
         )
 
 
-@router.post("/documents/{document_id}/search", response_model=SearchResponse)
+@router.post("/libraries/{library_id}/documents/{document_id}/search", response_model=SearchResponse)
 async def search_document(
+    library_id: LibraryID,
     document_id: DocumentID,
     request: SearchRequest,
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
     """Search for chunks in a specific document"""
     try:
+        # First verify document exists and belongs to the specified library
+        document = vector_db.get_document(document_id)
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found",
+            )
+        if document.library_id != library_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
+            )
+        
         results = vector_db.search_document(
             document_id=document_id,
             query_text=request.query_text,
@@ -416,6 +469,8 @@ async def search_document(
             total_chunks_searched=len(results),
             query_time_ms=0.0  # TODO: Add actual timing
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

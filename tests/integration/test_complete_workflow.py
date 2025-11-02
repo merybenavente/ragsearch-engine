@@ -68,7 +68,7 @@ class TestCompleteVectorDBWorkflow:
             "index_type": "naive"
         }
 
-        library_response = client.post("/api/libraries", json=library_data)
+        library_response = client.post("/api/v1/libraries", json=library_data)
         assert library_response.status_code == status.HTTP_201_CREATED
         library = library_response.json()
         library_id = library["id"]
@@ -93,7 +93,7 @@ class TestCompleteVectorDBWorkflow:
             "chunk_size": 80
         }
 
-        doc1_response = client.post(f"/api/libraries/{library_id}/documents", json=doc1_data)
+        doc1_response = client.post(f"/api/v1/libraries/{library_id}/documents", json=doc1_data)
         assert doc1_response.status_code == status.HTTP_201_CREATED
         doc1 = doc1_response.json()
         doc1_id = doc1["id"]
@@ -115,7 +115,7 @@ class TestCompleteVectorDBWorkflow:
             "chunk_size": 75
         }
 
-        doc2_response = client.post(f"/api/libraries/{library_id}/documents", json=doc2_data)
+        doc2_response = client.post(f"/api/v1/libraries/{library_id}/documents", json=doc2_data)
         assert doc2_response.status_code == status.HTTP_201_CREATED
         doc2 = doc2_response.json()
         doc2_id = doc2["id"]
@@ -133,7 +133,7 @@ class TestCompleteVectorDBWorkflow:
             "chunk_size": 90
         }
 
-        doc3_response = client.post(f"/api/libraries/{library_id}/documents", json=doc3_data)
+        doc3_response = client.post(f"/api/v1/libraries/{library_id}/documents", json=doc3_data)
         assert doc3_response.status_code == status.HTTP_201_CREATED
         doc3 = doc3_response.json()
         doc3_id = doc3["id"]
@@ -141,7 +141,7 @@ class TestCompleteVectorDBWorkflow:
         print(f"✓ Document 3 created: {doc3['chunk_count']} chunks")
 
         # Verify library now contains all documents
-        updated_library_response = client.get(f"/api/libraries/{library_id}")
+        updated_library_response = client.get(f"/api/v1/libraries/{library_id}")
         updated_library = updated_library_response.json()
         assert updated_library["document_count"] == 3
         print(f"✓ Library now contains {updated_library['document_count']} documents")
@@ -156,7 +156,7 @@ class TestCompleteVectorDBWorkflow:
             "min_similarity": 0.0
         }
 
-        tech_search_response = client.post(f"/api/libraries/{library_id}/search", json=tech_search_data)
+        tech_search_response = client.post(f"/api/v1/libraries/{library_id}/search", json=tech_search_data)
         assert tech_search_response.status_code == status.HTTP_200_OK
         tech_results = tech_search_response.json()
 
@@ -181,7 +181,7 @@ class TestCompleteVectorDBWorkflow:
             "min_similarity": 0.0  # Use 0.0 for mock embeddings
         }
 
-        science_search_response = client.post(f"/api/libraries/{library_id}/search", json=science_search_data)
+        science_search_response = client.post(f"/api/v1/libraries/{library_id}/search", json=science_search_data)
         assert science_search_response.status_code == status.HTTP_200_OK
         science_results = science_search_response.json()
 
@@ -195,7 +195,7 @@ class TestCompleteVectorDBWorkflow:
             "min_similarity": 0.0
         }
 
-        cross_search_response = client.post(f"/api/libraries/{library_id}/search", json=cross_search_data)
+        cross_search_response = client.post(f"/api/v1/libraries/{library_id}/search", json=cross_search_data)
         assert cross_search_response.status_code == status.HTTP_200_OK
         cross_results = cross_search_response.json()
 
@@ -217,7 +217,7 @@ class TestCompleteVectorDBWorkflow:
             "min_similarity": 0.0
         }
 
-        doc_search_response = client.post(f"/api/documents/{doc1_id}/search", json=doc_search_data)
+        doc_search_response = client.post(f"/api/v1/libraries/{library_id}/documents/{doc1_id}/search", json=doc_search_data)
         assert doc_search_response.status_code == status.HTTP_200_OK
         doc_results = doc_search_response.json()
 
@@ -238,7 +238,7 @@ class TestCompleteVectorDBWorkflow:
             "chunk_size": 70
         }
 
-        update_response = client.put(f"/api/documents/{doc1_id}", json=update_doc_data)
+        update_response = client.put(f"/api/v1/libraries/{library_id}/documents/{doc1_id}", json=update_doc_data)
         assert update_response.status_code == status.HTTP_200_OK
         updated_doc = update_response.json()
 
@@ -252,7 +252,7 @@ class TestCompleteVectorDBWorkflow:
             "min_similarity": 0.0
         }
 
-        update_search_response = client.post(f"/api/documents/{doc1_id}/search", json=update_search_data)
+        update_search_response = client.post(f"/api/v1/libraries/{library_id}/documents/{doc1_id}/search", json=update_search_data)
         assert update_search_response.status_code == status.HTTP_200_OK
         update_search_results = update_search_response.json()
 
@@ -265,7 +265,7 @@ class TestCompleteVectorDBWorkflow:
             "tags": ["integration", "workflow", "test", "updated"]
         }
 
-        library_update_response = client.put(f"/api/libraries/{library_id}", json=library_update_data)
+        library_update_response = client.put(f"/api/v1/libraries/{library_id}", json=library_update_data)
         assert library_update_response.status_code == status.HTTP_200_OK
         updated_library_meta = library_update_response.json()
 
@@ -277,7 +277,7 @@ class TestCompleteVectorDBWorkflow:
         print("\n=== Validating Data Consistency ===")
 
         # Get all documents in library
-        all_docs_response = client.get(f"/api/libraries/{library_id}/documents")
+        all_docs_response = client.get(f"/api/v1/libraries/{library_id}/documents")
         assert all_docs_response.status_code == status.HTTP_200_OK
         all_docs = all_docs_response.json()
 
@@ -286,14 +286,14 @@ class TestCompleteVectorDBWorkflow:
 
         # Verify each document can be retrieved individually
         for doc_summary in all_docs:
-            doc_detail_response = client.get(f"/api/documents/{doc_summary['id']}")
+            doc_detail_response = client.get(f"/api/v1/libraries/{library_id}/documents/{doc_summary['id']}")
             assert doc_detail_response.status_code == status.HTTP_200_OK
             doc_detail = doc_detail_response.json()
             assert doc_detail["id"] == doc_summary["id"]
             assert doc_detail["library_id"] == library_id
 
         # Get all libraries and verify our library is there
-        all_libraries_response = client.get("/api/libraries")
+        all_libraries_response = client.get("/api/v1/libraries")
         assert all_libraries_response.status_code == status.HTTP_200_OK
         all_libraries = all_libraries_response.json()
 
@@ -312,27 +312,27 @@ class TestCompleteVectorDBWorkflow:
         print("\n=== Testing Cleanup Operations ===")
 
         # Delete one document
-        delete_doc_response = client.delete(f"/api/documents/{doc3_id}")
+        delete_doc_response = client.delete(f"/api/v1/libraries/{library_id}/documents/{doc3_id}")
         assert delete_doc_response.status_code == status.HTTP_204_NO_CONTENT
         print(f"✓ Document {doc3_id} deleted")
 
         # Verify document is gone
-        deleted_doc_response = client.get(f"/api/documents/{doc3_id}")
+        deleted_doc_response = client.get(f"/api/v1/libraries/{library_id}/documents/{doc3_id}")
         assert deleted_doc_response.status_code == status.HTTP_404_NOT_FOUND
 
         # Verify library document count updated
-        library_after_delete_response = client.get(f"/api/libraries/{library_id}")
+        library_after_delete_response = client.get(f"/api/v1/libraries/{library_id}")
         library_after_delete = library_after_delete_response.json()
         assert library_after_delete["document_count"] == 2
         print("✓ Library document count updated after deletion")
 
         # Delete entire library (cascade delete)
-        delete_library_response = client.delete(f"/api/libraries/{library_id}")
+        delete_library_response = client.delete(f"/api/v1/libraries/{library_id}")
         assert delete_library_response.status_code == status.HTTP_204_NO_CONTENT
         print(f"✓ Library {library_id} deleted")
 
         # Verify library is gone
-        deleted_library_response = client.get(f"/api/libraries/{library_id}")
+        deleted_library_response = client.get(f"/api/v1/libraries/{library_id}")
         assert deleted_library_response.status_code == status.HTTP_404_NOT_FOUND
 
         # Verify remaining documents are also gone (cascade delete)
@@ -357,17 +357,17 @@ class TestCompleteVectorDBWorkflow:
 
         # Create library
         library_data = {"name": "Edge Case Test Library"}
-        library_response = client.post("/api/libraries", json=library_data)
+        library_response = client.post("/api/v1/libraries", json=library_data)
         library_id = library_response.json()["id"]
 
         # Create empty document
-        empty_doc_response = client.post(f"/api/libraries/{library_id}/documents", json={})
+        empty_doc_response = client.post(f"/api/v1/libraries/{library_id}/documents", json={})
         assert empty_doc_response.status_code == status.HTTP_201_CREATED
         empty_doc_id = empty_doc_response.json()["id"]
 
         # Search in empty document should return no results
         search_empty_response = client.post(
-            f"/api/documents/{empty_doc_id}/search",
+            f"/api/v1/libraries/{library_id}/documents/{empty_doc_id}/search",
             json={"query_text": "test", "k": 5}
         )
         assert search_empty_response.status_code == status.HTTP_200_OK
@@ -375,33 +375,33 @@ class TestCompleteVectorDBWorkflow:
 
         # Create minimal content document
         minimal_doc_data = {"text": "AI"}  # Very short content
-        minimal_doc_response = client.post(f"/api/libraries/{library_id}/documents", json=minimal_doc_data)
+        minimal_doc_response = client.post(f"/api/v1/libraries/{library_id}/documents", json=minimal_doc_data)
         assert minimal_doc_response.status_code == status.HTTP_201_CREATED
         minimal_doc = minimal_doc_response.json()
         assert minimal_doc["chunk_count"] >= 1
 
         # Search should work even with minimal content
         search_minimal_response = client.post(
-            f"/api/libraries/{library_id}/search",
+            f"/api/v1/libraries/{library_id}/search",
             json={"query_text": "artificial intelligence", "k": 5, "min_similarity": 0.0}
         )
         assert search_minimal_response.status_code == status.HTTP_200_OK
         # May or may not find results depending on similarity, but should not error
 
         # Cleanup
-        client.delete(f"/api/libraries/{library_id}")
+        client.delete(f"/api/v1/libraries/{library_id}")
 
     def test_workflow_error_recovery(self):
         """Test workflow behavior with various error conditions"""
 
         # Create library
         library_data = {"name": "Error Recovery Test Library"}
-        library_response = client.post("/api/libraries", json=library_data)
+        library_response = client.post("/api/v1/libraries", json=library_data)
         library_id = library_response.json()["id"]
 
         # Try to search in empty library
         search_empty_library_response = client.post(
-            f"/api/libraries/{library_id}/search",
+            f"/api/v1/libraries/{library_id}/search",
             json={"query_text": "test query", "k": 5}
         )
         assert search_empty_library_response.status_code == status.HTTP_200_OK
@@ -409,29 +409,29 @@ class TestCompleteVectorDBWorkflow:
 
         # Add a document
         doc_data = {"text": "Test document for error recovery"}
-        doc_response = client.post(f"/api/libraries/{library_id}/documents", json=doc_data)
+        doc_response = client.post(f"/api/v1/libraries/{library_id}/documents", json=doc_data)
         doc_id = doc_response.json()["id"]
 
         # Try invalid search parameters
         invalid_search_response = client.post(
-            f"/api/libraries/{library_id}/search",
+            f"/api/v1/libraries/{library_id}/search",
             json={"query_text": "", "k": 5}  # Empty query
         )
         assert invalid_search_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
         # Try search with k too high
         high_k_search_response = client.post(
-            f"/api/libraries/{library_id}/search",
+            f"/api/v1/libraries/{library_id}/search",
             json={"query_text": "test", "k": 500}  # Too high
         )
         assert high_k_search_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
         # Valid search should still work after errors
         valid_search_response = client.post(
-            f"/api/libraries/{library_id}/search",
+            f"/api/v1/libraries/{library_id}/search",
             json={"query_text": "test document", "k": 5}
         )
         assert valid_search_response.status_code == status.HTTP_200_OK
 
         # Cleanup
-        client.delete(f"/api/libraries/{library_id}")
+        client.delete(f"/api/v1/libraries/{library_id}")

@@ -24,7 +24,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(vector_db.router, prefix="/api")
+app.include_router(vector_db.router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -43,9 +43,9 @@ async def health_check():
         "service": "vector-db",
         "version": "0.1.0",
         "endpoints": {
-            "libraries": "/api/libraries",
-            "documents": "/api/libraries/{library_id}/documents",
-            "search": "/api/libraries/{library_id}/search"
+            "libraries": "/api/v1/libraries",
+            "documents": "/api/v1/libraries/{library_id}/documents",
+            "search": "/api/v1/libraries/{library_id}/search"
         }
     }
 
