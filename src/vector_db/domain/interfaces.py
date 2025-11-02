@@ -64,17 +64,6 @@ class VectorIndex(ABC):
         """
         pass
     
-    def get_library_index(self, library_id: LibraryID) -> 'SearchIndex':
-        """
-        Get the search index for a specific library.
-        
-        Args:
-            library_id: ID of the library
-            
-        Returns:
-            SearchIndex instance for the library
-        """
-        raise NotImplementedError("This method should be implemented by SearchIndex implementations that support library-specific indexes")
     
     @abstractmethod
     def get_document_chunks(self, document_id: DocumentID) -> List['Chunk']:
@@ -182,4 +171,17 @@ class SearchIndex(ABC):
     @abstractmethod
     def create_library_index(self, library_id: LibraryID, index_type: str) -> None:
         """Create an index for a library"""
+        pass
+    
+    @abstractmethod
+    def get_library_index(self, library_id: LibraryID) -> 'VectorIndex':
+        """
+        Get the vector index for a specific library.
+        
+        Args:
+            library_id: ID of the library
+            
+        Returns:
+            VectorIndex instance for the library
+        """
         pass

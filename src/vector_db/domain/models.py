@@ -1,4 +1,3 @@
-import numpy as np
 from pydantic import BaseModel, Field
 from typing import List, Optional, Set
 from datetime import datetime
@@ -88,7 +87,7 @@ class Document(BaseModel):
         """Create a new document with pre-created chunks"""
         if tags is None:
             tags = []
-        
+
         metadata = Metadata(username=username, tags=tags)
         return cls(library_id=library_id, chunks=chunks, metadata=metadata)
 
@@ -102,7 +101,7 @@ class Document(BaseModel):
         """Create an empty document (no content, no chunks)"""
         if tags is None:
             tags = []
-        
+
         metadata = Metadata(username=username, tags=tags)
         return cls(library_id=library_id, metadata=metadata)
 
@@ -146,7 +145,7 @@ class Library(BaseModel):
         """Create a new library"""
         if tags is None:
             tags = []
-        
+
         metadata = Metadata(username=username, tags=tags)
         return cls(name=name, metadata=metadata, index_type=index_type)
 
@@ -154,7 +153,7 @@ class Library(BaseModel):
         """Add a document reference to this library"""
         if document_id in self.document_ids:
             raise ValueError(f"Document {document_id} already exists in library")
-        
+
         updated_document_ids = self.document_ids.copy()
         updated_document_ids.add(document_id)
         return self.model_copy(update={
@@ -183,16 +182,16 @@ class Library(BaseModel):
         """Update library metadata"""
         if name is None and tags is None:
             return self
-        
+
         updates = {}
         if name is not None:
             updates['name'] = name
-        
+
         new_metadata = self.metadata
         if tags is not None:
             new_metadata = new_metadata.model_copy(update={'tags': tags})
         new_metadata = new_metadata.update_timestamp()
         updates['metadata'] = new_metadata
-        
+
         return self.model_copy(update=updates)
 

@@ -159,31 +159,10 @@ class VectorDBService:
             
             # Index document for search using DocumentIndexingService
             indexing_service = self._get_document_indexing_service(library_id)
+            indexing_service.index_document(document)
             
-            # Create chunks with embeddings
-            chunks_with_embeddings = []
-            for chunk in document.chunks:
-                if not chunk.embedding:
-                    embedding = self.embedding_service.create_embedding(
-                        chunk.text, 
-                        input_type="search_document"
-                    )
-                    chunk_with_embedding = chunk.model_copy(update={'embedding': embedding})
-                    chunks_with_embeddings.append(chunk_with_embedding)
-                else:
-                    chunks_with_embeddings.append(chunk)
-            
-            # Update document with chunks that have embeddings
-            document_with_embeddings = document.update_chunks(chunks_with_embeddings)
-            
-            # Save the updated document
-            self.document_repo.save(document_with_embeddings)
-            
-            # Index the document
-            indexing_service.index_document(document_with_embeddings)
-            
-            logger.info("Document created", doc_id=document.id, lib_id=library_id, chunks=len(document_with_embeddings.chunks))
-            return document_with_embeddings
+            logger.info("Document created", doc_id=document.id, lib_id=library_id, chunks=len(document.chunks))
+            return document
             
         except Exception as e:
             # Rollback: Try to clean up any partial state
@@ -251,31 +230,12 @@ class VectorDBService:
         # Persist changes
         self.document_repo.save(updated_document)
         
-        # Create chunks with embeddings
-        chunks_with_embeddings = []
-        for chunk in updated_document.chunks:
-            if not chunk.embedding:
-                embedding = self.embedding_service.create_embedding(
-                    chunk.text, 
-                    input_type="search_document"
-                )
-                chunk_with_embedding = chunk.model_copy(update={'embedding': embedding})
-                chunks_with_embeddings.append(chunk_with_embedding)
-            else:
-                chunks_with_embeddings.append(chunk)
-        
-        # Update document with chunks that have embeddings
-        final_document = updated_document.update_chunks(chunks_with_embeddings)
-        
-        # Save the final document
-        self.document_repo.save(final_document)
-        
         # Re-index document using DocumentIndexingService
         indexing_service = self._get_document_indexing_service(document.library_id)
-        indexing_service.index_document(final_document)
+        indexing_service.index_document(updated_document)
         
-        logger.info("Document updated", doc_id=document_id, chunks=f"{old_chunk_count}→{len(final_document.chunks)}")
-        return final_document
+        logger.info("Document updated", doc_id=document_id, chunks=f"{old_chunk_count}→{len(updated_document.chunks)}")
+        return updated_document
     
     def delete_document(self, document_id: DocumentID) -> None:
         """Delete a document and remove from library"""
@@ -420,10 +380,16 @@ class VectorDBService:
         for i in range(0, len(text), chunk_size):
             chunk_text = text[i:i + chunk_size]
             if chunk_text:  # Only create non-empty chunks
+                # Create embedding for this chunk
+                embedding = self.embedding_service.create_embedding(
+                    chunk_text, 
+                    input_type="search_document"
+                )
+                
                 chunk = Chunk(
                     document_id=document_id,
                     text=chunk_text,
-                    embedding=[],  # Will be populated by DocumentIndexingService
+                    embedding=embedding,  # Embedding created here
                     metadata=metadata  # Inherit document metadata
                 )
                 chunks.append(chunk)
