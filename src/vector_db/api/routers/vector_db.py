@@ -22,14 +22,14 @@ from ..schemas import (
 )
 from ..dependencies import get_vector_db_service
 from ...application.vector_db_service import VectorDBService
-from ...domain.models import LibraryID, DocumentID
+from ...domain.models import LibraryID, DocumentID, Library, Document
 from ...infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["vector-db"])
 
 
-def _to_library_response(library) -> LibraryResponse:
+def _to_library_response(library: Library) -> LibraryResponse:
     """Convert domain Library to LibraryResponse"""
     return LibraryResponse(
         id=library.id,
@@ -44,7 +44,7 @@ def _to_library_response(library) -> LibraryResponse:
     )
 
 
-def _to_document_response(document) -> DocumentResponse:
+def _to_document_response(document: Document) -> DocumentResponse:
     """Convert domain Document to DocumentResponse"""
     full_text = document.get_full_text()
     return DocumentResponse(
