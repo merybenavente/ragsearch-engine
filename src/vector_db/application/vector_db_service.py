@@ -56,6 +56,10 @@ class VectorDBService:
         index_type: str = "naive"
     ) -> Library:
         """Create a new library with search index"""
+        # Validate parameters
+        if not name or name.strip() == "":
+            raise ValueError("Library name cannot be empty")
+        
         # Check for duplicate names
         existing_libraries = self.library_repo.list_all()
         if any(lib.name == name for lib in existing_libraries):
@@ -308,6 +312,12 @@ class VectorDBService:
         min_similarity: float = 0.0
     ) -> List[Tuple[Chunk, float]]:
         """Search for chunks in a library"""
+        # Validate parameters
+        if k <= 0:
+            raise ValueError("k must be greater than 0")
+        if not query_text or query_text.strip() == "":
+            raise ValueError("query_text cannot be empty")
+        
         # Verify library exists
         library = self.library_repo.get(library_id)
         if not library:
@@ -330,6 +340,12 @@ class VectorDBService:
         min_similarity: float = 0.0
     ) -> List[Tuple[Chunk, float]]:
         """Search for chunks in a specific document"""
+        # Validate parameters
+        if k <= 0:
+            raise ValueError("k must be greater than 0")
+        if not query_text or query_text.strip() == "":
+            raise ValueError("query_text cannot be empty")
+        
         # Verify document exists
         document = self.document_repo.get(document_id)
         if not document:

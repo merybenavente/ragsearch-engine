@@ -1,5 +1,7 @@
 """Pytest configuration and fixtures"""
 
+import hashlib
+import numpy as np
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -19,19 +21,6 @@ def pytest_configure(config):
 pytest_asyncio.asyncio_mode = "auto"
 
 
-@pytest.fixture
-def client():
-    """Create test client for FastAPI app"""
-    return TestClient(app)
-
-
-@pytest.fixture
-def mock_logger():
-    """Mock logger for testing"""
-    with patch('src.vector_db.infrastructure.logging.get_logger') as mock:
-        yield mock
-
-
 @pytest.fixture(autouse=True)
 def reset_repositories():
     """Reset repository state between tests"""
@@ -47,7 +36,8 @@ def sample_library_data():
     return {
         "name": "Test Library",
         "username": "testuser",
-        "tags": ["tag1", "tag2"]
+        "tags": ["tag1", "tag2"],
+        "index_type": "naive"
     }
 
 
@@ -61,32 +51,18 @@ def sample_document_data():
         "chunk_size": 50
     }
 
-
-@pytest.fixture  
-def mock_cohere_embed():
-    """Mock Cohere embedding API with standard response"""
-    from src.vector_db.domain.models import EMBEDDING_DIMENSION
-    with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
-        mock_co.embed.return_value = mock_response
-        yield mock_co
-
-
 @pytest.fixture
 def mock_cohere_deterministic():
     """Mock Cohere embedding API with deterministic embeddings based on text content"""
-    import hashlib
-    import numpy as np
     from src.vector_db.domain.models import EMBEDDING_DIMENSION
-    
+
     def create_deterministic_embedding(text: str) -> list[float]:
         """Create deterministic mock embedding based on text hash"""
         seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
         np.random.seed(seed % (2**32))
         embedding = np.random.randn(EMBEDDING_DIMENSION)
         return (embedding / np.linalg.norm(embedding)).tolist()
-    
+
     with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
         def mock_embed(texts, **kwargs):
             if isinstance(texts, str):
@@ -95,6 +71,6 @@ def mock_cohere_deterministic():
             mock_response = MagicMock()
             mock_response.embeddings = embeddings
             return mock_response
-        
+
         mock_co.embed = mock_embed
         yield mock_co

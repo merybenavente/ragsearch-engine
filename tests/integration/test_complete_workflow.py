@@ -13,6 +13,8 @@ The test successfully demonstrates the entire user journey:
   5. ✅ Data Consistency - Validates data integrity across operations
   6. 🗑️ Cleanup & Deletion - Tests individual and cascade deletion
 """
+import hashlib
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from fastapi import status
@@ -28,8 +30,6 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def mock_cohere_embedding_service():
     """Mock the Cohere embedding service for integration tests with realistic embeddings"""
-    import hashlib
-    import numpy as np
 
     def create_realistic_embedding(text: str) -> list[float]:
         """Create deterministic but realistic mock embedding based on text content"""
