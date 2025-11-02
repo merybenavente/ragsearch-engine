@@ -19,6 +19,7 @@ from fastapi import status
 from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
+from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 client = TestClient(app)
 
@@ -35,7 +36,7 @@ def mock_cohere_embedding_service():
         # Create deterministic embedding based on text hash
         seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
         np.random.seed(seed % (2**32))
-        embedding = np.random.randn(1536)
+        embedding = np.random.randn(EMBEDDING_DIMENSION)
         # Normalize to unit vector for realistic similarity calculations
         embedding = embedding / np.linalg.norm(embedding)
         return embedding.tolist()

@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
 from src.vector_db.api.dependencies import get_vector_db_service, get_document_repository, get_library_repository
+from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 
 class TestDDDRepositories:
@@ -38,7 +39,7 @@ class TestDDDRepositories:
         """Test basic document repository operations"""
         # Mock the Cohere API response
         mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * 1536]
+        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
         mock_co.embed.return_value = mock_response
 
         # Create a library and document
@@ -66,7 +67,7 @@ class TestDDDRepositories:
         """Test that repositories maintain consistency"""
         # Mock the Cohere API response
         mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * 1536]
+        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
         mock_co.embed.return_value = mock_response
 
         # Create a library
@@ -95,7 +96,7 @@ class TestDDDRepositories:
         """Test delete operations maintain consistency"""
         # Mock the Cohere API response
         mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * 1536]
+        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
         mock_co.embed.return_value = mock_response
 
         # Create a library with documents

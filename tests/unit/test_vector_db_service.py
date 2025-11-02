@@ -6,7 +6,7 @@ import numpy as np
 from uuid import uuid4
 
 from src.vector_db.application.vector_db_service import VectorDBService
-from src.vector_db.domain.models import Chunk
+from src.vector_db.domain.models import Chunk, Document, EMBEDDING_DIMENSION
 from src.vector_db.domain.interfaces import EmbeddingService
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
@@ -21,7 +21,7 @@ class MockEmbeddingService(EmbeddingService):
         # Create deterministic embedding based on text hash
         seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
         np.random.seed(seed % (2**32))
-        embedding = np.random.randn(1536)
+        embedding = np.random.randn(EMBEDDING_DIMENSION)
         return (embedding / np.linalg.norm(embedding)).tolist()
 
 
@@ -109,7 +109,7 @@ class TestVectorDBService:
 
         # Verify chunks have embeddings
         for chunk in document.chunks:
-            assert len(chunk.embedding) == 1536
+            assert len(chunk.embedding) == EMBEDDING_DIMENSION
             assert chunk.document_id == document.id
 
     def test_create_document_library_not_found(self):
@@ -149,7 +149,7 @@ class TestVectorDBService:
 
         # Verify chunks have similarity scores (via mock embeddings)
         for chunk, score in results:
-            assert len(chunk.embedding) == 1536
+            assert len(chunk.embedding) == EMBEDDING_DIMENSION
             assert isinstance(score, float)
 
     def test_search_library_not_found(self):
@@ -304,10 +304,85 @@ class TestVectorDBService:
         embedding2 = self.mock_embedding.create_embedding(text)
 
         assert embedding1 == embedding2
-        assert len(embedding1) == 1536
+        assert len(embedding1) == EMBEDDING_DIMENSION
 
         # Different text should produce different embeddings
         different_text = "Different text"
         different_embedding = self.mock_embedding.create_embedding(different_text)
 
         assert different_embedding != embedding1
+
+    def test_list_libraries(self):
+        """Test listing all libraries"""
+        # Create a few libraries
+        lib1 = self.vector_db_service.create_library(name="Library 1")
+        lib2 = self.vector_db_service.create_library(name="Library 2")
+
+        libraries = self.vector_db_service.list_libraries()
+
+        assert isinstance(libraries, list)
+        assert len(libraries) == 2
+        library_names = [lib.name for lib in libraries]
+        assert "Library 1" in library_names
+        assert "Library 2" in library_names
+
+    def test_create_empty_document(self):
+        """Test creating an empty document"""
+        library = self.vector_db_service.create_library(name="Test Library")
+        document = self.vector_db_service.create_empty_document(
+            library_id=library.id,
+            username="testuser",
+            tags=["test", "empty"]
+        )
+
+        assert isinstance(document, Document)
+        assert document.library_id == library.id
+        assert document.metadata.username == "testuser"
+        assert "test" in document.metadata.tags
+        assert "empty" in document.metadata.tags
+        assert len(document.chunks) == 0
+
+    def test_search_document(self):
+        """Test searching within a specific document"""
+        # Create library and document
+        library = self.vector_db_service.create_library(name="Test Library")
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
+            text="This is a test document about artificial intelligence and machine learning."
+        )
+
+        results = self.vector_db_service.search_document(
+            document_id=document.id,
+            query_text="artificial intelligence",
+            k=3,
+            min_similarity=0.0
+        )
+
+        assert isinstance(results, list)
+        assert len(results) > 0
+        assert all(isinstance(chunk, Chunk) for chunk, _ in results)
+        assert all(isinstance(score, float) for _, score in results)
+        # Verify all results are from the target document
+        for chunk, score in results:
+            assert chunk.document_id == document.id
+
+    def test_update_document_content(self):
+        """Test updating document content"""
+        library = self.vector_db_service.create_library(name="Test Library")
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
+            text="Original content."
+        )
+
+        updated_document = self.vector_db_service.update_document_content(
+            document_id=document.id,
+            new_text="Updated content about machine learning.",
+            chunk_size=100
+        )
+
+        assert isinstance(updated_document, Document)
+        assert updated_document.id == document.id
+        assert len(updated_document.chunks) > 0
+        # Verify content was updated
+        full_text = updated_document.get_full_text()
+        assert "Updated content" in full_text

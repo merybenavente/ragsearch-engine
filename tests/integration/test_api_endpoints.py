@@ -7,6 +7,7 @@ from uuid import uuid4
 from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
+from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 client = TestClient(app)
 
@@ -17,7 +18,7 @@ def mock_cohere_embedding_service():
     """Mock the Cohere embedding service for integration tests"""
     with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
         mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * 1536]  # Mock embedding
+        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]  # Mock embedding
         mock_co.embed.return_value = mock_response
         yield mock_co
 
