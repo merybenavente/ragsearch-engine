@@ -181,22 +181,30 @@ class VectorDBService:
     ) -> Document:
         """Create an empty document in a library"""
         # Verify library exists
-        library = self.library_repo.get(library_id)
-        if not library:
-            raise ValueError(f"Library {library_id} not found")
+        library = self._ensure_library_exists(library_id)
         
         # Create empty document (domain logic)
         document = Document.create_empty(library_id, username, tags)
         
-        # Persist document
-        self.document_repo.save(document)
-        
-        # Update library membership
-        updated_library = library.add_document_reference(document.id)
-        self.library_repo.save(updated_library)
-        
-        logger.info("Empty document created", doc_id=document.id, lib_id=library_id)
-        return document
+        try:
+            # Persist document
+            self.document_repo.save(document)
+            
+            # Update library membership
+            updated_library = library.add_document_reference(document.id)
+            self.library_repo.save(updated_library)
+            
+            logger.info("Empty document created", doc_id=document.id, lib_id=library_id)
+            return document
+            
+        except Exception as e:
+            # Rollback: Try to clean up any partial state
+            try:
+                self.document_repo.delete(document.id)
+                logger.warning("Rolled back empty document creation", doc_id=document.id, error=str(e))
+            except Exception:
+                logger.error("Failed to rollback empty document creation", doc_id=document.id)
+            raise
     
     def get_document(self, document_id: DocumentID) -> Optional[Document]:
         """Get a document by ID"""
