@@ -6,6 +6,7 @@ including libraries, documents, and similarity search.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
+import time
 
 from ..schemas import (
     CreateLibraryRequest,
@@ -18,7 +19,8 @@ from ..schemas import (
     SearchResponse,
     SearchResult,
     ChunkResponse,
-    MetadataResponse
+    MetadataResponse,
+    ErrorResponse
 )
 from ..dependencies import get_vector_db_service
 from ...application.vector_db_service import VectorDBService
@@ -63,7 +65,7 @@ def _to_document_response(document: Document) -> DocumentResponse:
 
 # Library Operations
 
-@router.post("/libraries", response_model=LibraryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/libraries", response_model=LibraryResponse, status_code=status.HTTP_201_CREATED, responses={409: {"model": ErrorResponse}, 400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
 async def create_library(
     request: CreateLibraryRequest,
     vector_db: VectorDBService = Depends(get_vector_db_service),
@@ -96,7 +98,7 @@ async def create_library(
         )
 
 
-@router.get("/libraries", response_model=List[LibraryResponse])
+@router.get("/libraries", response_model=List[LibraryResponse], responses={500: {"model": ErrorResponse}})
 async def get_libraries(
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
@@ -112,7 +114,7 @@ async def get_libraries(
         )
 
 
-@router.get("/libraries/{library_id}", response_model=LibraryResponse)
+@router.get("/libraries/{library_id}", response_model=LibraryResponse, responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
 async def get_library(
     library_id: LibraryID,
     vector_db: VectorDBService = Depends(get_vector_db_service),
@@ -378,12 +380,15 @@ async def search_library(
 ):
     """Search for chunks in a library"""
     try:
+        start_time = time.time()
         results = vector_db.search_library(
             library_id=library_id,
             query_text=request.query_text,
             k=request.k,
             min_similarity=request.min_similarity,
         )
+        query_time_ms = (time.time() - start_time) * 1000
+        
         return SearchResponse(
             results=[
                 SearchResult(
@@ -403,7 +408,7 @@ async def search_library(
                 for chunk, similarity in results
             ],
             total_chunks_searched=len(results),
-            query_time_ms=0.0  # TODO: Add actual timing
+            query_time_ms=query_time_ms
         )
     except ValueError as e:
         raise HTTPException(
@@ -440,12 +445,15 @@ async def search_document(
                 detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
             )
 
+        start_time = time.time()
         results = vector_db.search_document(
             document_id=document_id,
             query_text=request.query_text,
             k=request.k,
             min_similarity=request.min_similarity,
         )
+        query_time_ms = (time.time() - start_time) * 1000
+        
         return SearchResponse(
             results=[
                 SearchResult(
@@ -466,7 +474,7 @@ async def search_document(
                 for chunk, similarity in results
             ],
             total_chunks_searched=len(results),
-            query_time_ms=0.0  # TODO: Add actual timing
+            query_time_ms=query_time_ms
         )
     except HTTPException:
         raise

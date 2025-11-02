@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,10 +9,20 @@ from ..infrastructure.logging import configure_logging, get_logger
 configure_logging()
 logger = get_logger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    # Startup
+    logger.info("Vector Database API starting up", version="0.1.0")
+    yield
+    # Shutdown
+    logger.info("Vector Database API shutting down")
+
 app = FastAPI(
     title="Vector Database API",
     description="A FastAPI backend for vector database operations with document indexing and similarity search",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -50,16 +61,6 @@ async def health_check():
     }
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Application startup event"""
-    logger.info("Vector Database API starting up", version="0.1.0")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Application shutdown event"""
-    logger.info("Vector Database API shutting down")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ This service orchestrates all vector database operations following Domain-Driven
 It coordinates between domain entities, repositories, and infrastructure services.
 """
 from typing import List, Optional, Tuple
-from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID
+from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata
 from ..domain.interfaces import (
     DocumentRepository, 
     LibraryRepository, 
@@ -42,7 +42,7 @@ class VectorDBService:
     
     def _get_document_indexing_service(self, library_id: LibraryID) -> DocumentIndexingService:
         """Get a DocumentIndexingService for a specific library"""
-        library_index = self.search_index._get_library_index(library_id)
+        library_index = self.search_index.get_library_index(library_id)
         return DocumentIndexingService(library_index, self.embedding_service)
         
     
@@ -394,7 +394,6 @@ class VectorDBService:
     
     def _create_chunks_from_text(self, document_id: DocumentID, text: str, chunk_size: int = 500, metadata=None) -> List[Chunk]:
         """Create chunks from text with embeddings (application layer logic)"""
-        from ..domain.models import Chunk, Metadata  # Import here to avoid circular imports
         
         # Use provided metadata or create default
         if metadata is None:
