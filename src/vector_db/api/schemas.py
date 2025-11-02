@@ -64,7 +64,6 @@ class ChunkResponse(BaseModel):
     id: ChunkID
     document_id: DocumentID
     text: str
-    embedding: List[float]
     metadata: MetadataResponse
 
 

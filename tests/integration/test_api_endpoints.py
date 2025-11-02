@@ -495,7 +495,7 @@ class TestSearchEndpoints:
         library_data = {"name": "Test Library"}
         lib_response = client.post("/api/v1/libraries", json=library_data)
         library_id = lib_response.json()["id"]
-        
+
         non_existent_document_id = str(uuid4())
         search_data = {
             "query_text": "test query",
@@ -616,7 +616,6 @@ class TestSearchEndpoints:
             assert "id" in chunk
             assert "document_id" in chunk
             assert "text" in chunk
-            assert "embedding" in chunk
             assert "metadata" in chunk
 
             # Validate chunk metadata structure
@@ -627,10 +626,6 @@ class TestSearchEndpoints:
             assert "tags" in metadata
             assert metadata["username"] == "test_user"
             assert metadata["tags"] == ["test", "validation"]
-
-            # Validate embedding structure
-            assert isinstance(chunk["embedding"], list)
-            assert len(chunk["embedding"]) == 1536  # Standard embedding dimension
 
 
 class TestErrorHandling:

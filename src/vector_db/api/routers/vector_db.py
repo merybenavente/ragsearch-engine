@@ -309,7 +309,7 @@ async def update_document(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
             )
-        
+
         updated_document = vector_db.update_document_content(
             document_id=document_id,
             new_text=request.text,
@@ -351,7 +351,7 @@ async def delete_document(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
             )
-        
+
         vector_db.delete_document(document_id)
     except HTTPException:
         raise
@@ -391,7 +391,6 @@ async def search_library(
                         id=chunk.id,
                         document_id=chunk.document_id,
                         text=chunk.text,
-                        embedding=chunk.embedding,
                         metadata=MetadataResponse(
                             creation_time=chunk.metadata.creation_time,
                             last_update=chunk.metadata.last_update,
@@ -440,7 +439,7 @@ async def search_document(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Document with ID '{document_id}' not found in library '{library_id}'",
             )
-        
+
         results = vector_db.search_document(
             document_id=document_id,
             query_text=request.query_text,
@@ -454,7 +453,7 @@ async def search_document(
                         id=chunk.id,
                         document_id=chunk.document_id,
                         text=chunk.text,
-                        embedding=chunk.embedding,
+                        # embedding=chunk.embedding,  # Removed: not exposed in API
                         metadata=MetadataResponse(
                             creation_time=chunk.metadata.creation_time,
                             last_update=chunk.metadata.last_update,
