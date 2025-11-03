@@ -20,7 +20,9 @@ class IndexFactory:
         if index_type == "naive":
             return NaiveIndex()
         elif index_type == "lsh":
-            return LSHIndex()
+            # Use parameters optimized for semantic search with high-dimensional embeddings
+            # For 1536-dim embeddings, use fewer hyperplanes for larger buckets = higher recall
+            return LSHIndex(num_tables=8, num_hyperplanes=6)
         elif index_type == "vptree":
             return VPTreeIndex()
         else:
