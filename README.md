@@ -305,7 +305,7 @@ Logs include:
 
 - **Immutable Design**: Models use Pydantic's `model_copy()` for updates
 - **Automatic Chunking**: Documents automatically split text into chunks
-- **Embedding Generation**: Each chunk gets a vector embedding (currently random, placeholder for real embeddings)
+- **Embedding Generation**: Each chunk gets a vector embedding.
 - **Metadata Tracking**: Creation time, last update, tags, and user information
 
 ### Thread Safety
