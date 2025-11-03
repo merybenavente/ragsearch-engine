@@ -276,6 +276,8 @@ Type checking:
 poetry run mypy src/
 ```
 
+Pre-commit hooks are configured to run linting and formatting automatically on each commit.
+
 ### Logging
 
 The application uses structured logging with `structlog`:
