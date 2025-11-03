@@ -1,7 +1,5 @@
 # New DDD Architecture Dependencies
-from ..infrastructure.repositories import (
-    RepositoryManager
-)
+from ..infrastructure.repositories import RepositoryManager
 from ..infrastructure.embedding_service import CohereEmbeddingService
 from ..infrastructure.search_index import RepositoryAwareSearchIndex
 from ..infrastructure.index_factory import get_index_factory
@@ -10,7 +8,7 @@ from ..domain.interfaces import (
     DocumentRepository,
     LibraryRepository,
     SearchIndex,
-    EmbeddingService
+    EmbeddingService,
 )
 
 from ..infrastructure.logging import get_logger
@@ -25,10 +23,7 @@ _embedding_service: EmbeddingService = CohereEmbeddingService()
 _index_factory = get_index_factory()
 _search_index: SearchIndex = RepositoryAwareSearchIndex(_index_factory)
 _vector_db_service = VectorDBService(
-    _document_repository,
-    _library_repository,
-    _search_index,
-    _embedding_service
+    _document_repository, _library_repository, _search_index, _embedding_service
 )
 
 

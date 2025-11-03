@@ -66,7 +66,9 @@ class LSHIndex(BaseVectorIndex):
             # Generate random hyperplanes for this table
             table_hyperplanes = rng.randn(self.num_hyperplanes, vector_dim)
             # Normalize hyperplanes
-            table_hyperplanes = table_hyperplanes / np.linalg.norm(table_hyperplanes, axis=1, keepdims=True)
+            table_hyperplanes = table_hyperplanes / np.linalg.norm(
+                table_hyperplanes, axis=1, keepdims=True
+            )
             self.hyperplanes.append(table_hyperplanes)
 
     def _compute_hash_code(self, vector: List[float], table_idx: int) -> str:
@@ -84,9 +86,9 @@ class LSHIndex(BaseVectorIndex):
         hash_bits = (dot_products > 0).astype(int)
 
         # Convert binary array to string for use as dictionary key
-        return ''.join(hash_bits.astype(str))
+        return "".join(hash_bits.astype(str))
 
-    def _add_chunks_impl(self, chunks: List['Chunk']) -> None:
+    def _add_chunks_impl(self, chunks: List["Chunk"]) -> None:
         """Index chunks using LSH algorithm"""
         if not chunks:
             return
@@ -133,7 +135,9 @@ class LSHIndex(BaseVectorIndex):
                 if not bucket:
                     del hash_table[hash_code]
 
-    def _search_impl(self, query_embedding: List[float], k: int, min_similarity: float) -> List[Tuple['Chunk', float]]:
+    def _search_impl(
+        self, query_embedding: List[float], k: int, min_similarity: float
+    ) -> List[Tuple["Chunk", float]]:
         """Search using LSH algorithm"""
         if not self.hyperplanes or not query_embedding:
             return []
@@ -152,7 +156,9 @@ class LSHIndex(BaseVectorIndex):
             if chunk_id in self._chunks:
                 chunk = self._chunks[chunk_id]
                 if chunk.embedding:
-                    similarity = self._cosine_similarity(query_embedding, chunk.embedding)
+                    similarity = self._cosine_similarity(
+                        query_embedding, chunk.embedding
+                    )
                     if similarity >= min_similarity:
                         similarities.append((chunk, similarity))
 

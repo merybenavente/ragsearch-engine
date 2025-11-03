@@ -9,6 +9,7 @@ from enum import Enum
 
 class LogLevel(str, Enum):
     """Log levels"""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -19,11 +20,11 @@ class LogLevel(str, Enum):
 def configure_logging(
     level: LogLevel = LogLevel.INFO,
     json_format: bool = False,
-    include_request_id: bool = True
+    include_request_id: bool = True,
 ) -> None:
     """
     Configure structured logging for the application
-    
+
     Args:
         level: Logging level
         json_format: Whether to use JSON format for logs
@@ -35,7 +36,7 @@ def configure_logging(
         stream=sys.stdout,
         level=getattr(logging, level.value),
     )
-    
+
     # Configure structlog
     processors = [
         structlog.contextvars.merge_contextvars,
@@ -44,12 +45,12 @@ def configure_logging(
         structlog.processors.StackInfoRenderer(),
         structlog.dev.set_exc_info,
     ]
-    
+
     if json_format:
         processors.append(structlog.processors.JSONRenderer())
     else:
         processors.append(structlog.dev.ConsoleRenderer())
-    
+
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(
@@ -63,10 +64,10 @@ def configure_logging(
 def get_logger(name: str) -> structlog.BoundLogger:
     """
     Get a structured logger instance
-    
+
     Args:
         name: Logger name (typically __name__)
-        
+
     Returns:
         Configured structlog logger
     """
@@ -75,7 +76,7 @@ def get_logger(name: str) -> structlog.BoundLogger:
 
 class LoggerMixin:
     """Mixin class to add logging capabilities to any class"""
-    
+
     @property
     def logger(self) -> structlog.BoundLogger:
         """Get logger instance for this class"""
@@ -85,23 +86,19 @@ class LoggerMixin:
 def log_function_call(func_name: str, **kwargs: Any) -> None:
     """
     Log a function call with parameters
-    
+
     Args:
         func_name: Name of the function being called
         **kwargs: Function parameters to log
     """
     logger = get_logger("function_calls")
-    logger.info(
-        "Function called",
-        function=func_name,
-        parameters=kwargs
-    )
+    logger.info("Function called", function=func_name, parameters=kwargs)
 
 
 def log_performance(operation: str, duration_ms: float, **context: Any) -> None:
     """
     Log performance metrics
-    
+
     Args:
         operation: Name of the operation
         duration_ms: Duration in milliseconds
@@ -109,17 +106,14 @@ def log_performance(operation: str, duration_ms: float, **context: Any) -> None:
     """
     logger = get_logger("performance")
     logger.info(
-        "Performance metric",
-        operation=operation,
-        duration_ms=duration_ms,
-        **context
+        "Performance metric", operation=operation, duration_ms=duration_ms, **context
     )
 
 
 def log_error(error: Exception, context: Dict[str, Any] = None) -> None:
     """
     Log an error with context
-    
+
     Args:
         error: The exception that occurred
         context: Additional context information
@@ -129,5 +123,5 @@ def log_error(error: Exception, context: Dict[str, Any] = None) -> None:
         "Error occurred",
         error_type=type(error).__name__,
         error_message=str(error),
-        context=context or {}
+        context=context or {},
     )

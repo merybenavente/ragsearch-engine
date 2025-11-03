@@ -5,12 +5,20 @@ This service orchestrates all vector database operations following Domain-Driven
 It coordinates between domain entities, repositories, and infrastructure services.
 """
 from typing import List, Optional, Tuple
-from ..domain.models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID, Metadata
+from ..domain.models import (
+    Document,
+    DocumentID,
+    Library,
+    LibraryID,
+    Chunk,
+    ChunkID,
+    Metadata,
+)
 from ..domain.interfaces import (
     DocumentRepository,
     LibraryRepository,
     SearchIndex,
-    EmbeddingService
+    EmbeddingService,
 )
 from .document_indexing_service import DocumentIndexingService
 from ..infrastructure.logging import get_logger
@@ -34,18 +42,19 @@ class VectorDBService:
         document_repository: DocumentRepository,
         library_repository: LibraryRepository,
         search_index: SearchIndex,
-        embedding_service: EmbeddingService
+        embedding_service: EmbeddingService,
     ):
         self.document_repo = document_repository
         self.library_repo = library_repository
         self.search_index = search_index
         self.embedding_service = embedding_service
 
-    def _get_document_indexing_service(self, library_id: LibraryID) -> DocumentIndexingService:
+    def _get_document_indexing_service(
+        self, library_id: LibraryID
+    ) -> DocumentIndexingService:
         """Get a DocumentIndexingService for a specific library"""
         library_index = self.search_index.get_library_index(library_id)
         return DocumentIndexingService(library_index, self.embedding_service)
-
 
     # Library Operations
 
@@ -55,7 +64,7 @@ class VectorDBService:
         username: Optional[str] = None,
         tags: Optional[List[str]] = None,
         index_type: str = "naive",
-        index_params: Optional[dict] = None
+        index_params: Optional[dict] = None,
     ) -> Library:
         """Create a new library with search index"""
         # Validate parameters
@@ -64,7 +73,9 @@ class VectorDBService:
 
         # Validate index type
         if index_type not in AVAILABLE_INDEX_TYPES:
-            raise ValueError(f"Invalid index type '{index_type}'. Valid types are: {', '.join(AVAILABLE_INDEX_TYPES)}")
+            raise ValueError(
+                f"Invalid index type '{index_type}'. Valid types are: {', '.join(AVAILABLE_INDEX_TYPES)}"
+            )
 
         # Check for duplicate names
         existing_libraries = self.library_repo.list_all()
@@ -80,7 +91,9 @@ class VectorDBService:
         # Persist library
         self.library_repo.save(library)
 
-        logger.info("Library created", lib_id=library.id, name=name, index_type=index_type)
+        logger.info(
+            "Library created", lib_id=library.id, name=name, index_type=index_type
+        )
         return library
 
     def get_library(self, library_id: LibraryID) -> Optional[Library]:
@@ -98,7 +111,7 @@ class VectorDBService:
         self,
         library_id: LibraryID,
         name: Optional[str] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
     ) -> Library:
         """Update library metadata"""
         library = self._ensure_library_exists(library_id)
@@ -106,7 +119,9 @@ class VectorDBService:
         # Check for duplicate names (if name is being updated)
         if name and name != library.name:
             existing_libraries = self.library_repo.list_all()
-            if any(lib.name == name and lib.id != library_id for lib in existing_libraries):
+            if any(
+                lib.name == name and lib.id != library_id for lib in existing_libraries
+            ):
                 raise ValueError(f"Library with name '{name}' already exists")
 
         updated_library = library.update_metadata(name, tags)
@@ -131,7 +146,9 @@ class VectorDBService:
         # Delete the library
         self.library_repo.delete(library_id)
 
-        logger.info("Library deleted", lib_id=library_id, documents_deleted=len(documents))
+        logger.info(
+            "Library deleted", lib_id=library_id, documents_deleted=len(documents)
+        )
 
     def list_libraries(self) -> List[Library]:
         """List all libraries"""
@@ -145,7 +162,7 @@ class VectorDBService:
         text: str,
         username: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        chunk_size: int = 500
+        chunk_size: int = 500,
     ) -> Document:
         """Create a new document with content in a library"""
         # Verify library exists
@@ -156,7 +173,9 @@ class VectorDBService:
 
         # Create chunks with embeddings if text provided (application layer responsibility)
         if text:
-            chunks = self._create_chunks_from_text(document.id, text, chunk_size, document.metadata)
+            chunks = self._create_chunks_from_text(
+                document.id, text, chunk_size, document.metadata
+            )
             document = document.update_chunks(chunks)
 
         try:
@@ -171,14 +190,21 @@ class VectorDBService:
             indexing_service = self._get_document_indexing_service(library_id)
             indexing_service.index_document(document)
 
-            logger.info("Document created", doc_id=document.id, lib_id=library_id, chunks=len(document.chunks))
+            logger.info(
+                "Document created",
+                doc_id=document.id,
+                lib_id=library_id,
+                chunks=len(document.chunks),
+            )
             return document
 
         except Exception as e:
             # Rollback: Try to clean up any partial state
             try:
                 self.document_repo.delete(document.id)
-                logger.warning("Rolled back document creation", doc_id=document.id, error=str(e))
+                logger.warning(
+                    "Rolled back document creation", doc_id=document.id, error=str(e)
+                )
             except Exception:
                 logger.error("Failed to rollback document creation", doc_id=document.id)
             raise
@@ -187,7 +213,7 @@ class VectorDBService:
         self,
         library_id: LibraryID,
         username: Optional[str] = None,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
     ) -> Document:
         """Create an empty document in a library"""
         # Verify library exists
@@ -211,9 +237,15 @@ class VectorDBService:
             # Rollback: Try to clean up any partial state
             try:
                 self.document_repo.delete(document.id)
-                logger.warning("Rolled back empty document creation", doc_id=document.id, error=str(e))
+                logger.warning(
+                    "Rolled back empty document creation",
+                    doc_id=document.id,
+                    error=str(e),
+                )
             except Exception:
-                logger.error("Failed to rollback empty document creation", doc_id=document.id)
+                logger.error(
+                    "Failed to rollback empty document creation", doc_id=document.id
+                )
             raise
 
     def get_document(self, document_id: DocumentID) -> Optional[Document]:
@@ -228,10 +260,7 @@ class VectorDBService:
         return document
 
     def update_document_content(
-        self,
-        document_id: DocumentID,
-        new_text: str,
-        chunk_size: int = 500
+        self, document_id: DocumentID, new_text: str, chunk_size: int = 500
     ) -> Document:
         """Update document content and re-index"""
         document = self.document_repo.get(document_id)
@@ -240,7 +269,13 @@ class VectorDBService:
 
         # Create new chunks with embeddings (application layer responsibility)
         old_chunk_count = len(document.chunks)
-        new_chunks = self._create_chunks_from_text(document.id, new_text, chunk_size, document.metadata) if new_text else []
+        new_chunks = (
+            self._create_chunks_from_text(
+                document.id, new_text, chunk_size, document.metadata
+            )
+            if new_text
+            else []
+        )
 
         # Update document with new chunks (domain logic)
         updated_document = document.update_chunks(new_chunks)
@@ -252,7 +287,11 @@ class VectorDBService:
         indexing_service = self._get_document_indexing_service(document.library_id)
         indexing_service.index_document(updated_document)
 
-        logger.info("Document updated", doc_id=document_id, chunks=f"{old_chunk_count}→{len(updated_document.chunks)}")
+        logger.info(
+            "Document updated",
+            doc_id=document_id,
+            chunks=f"{old_chunk_count}→{len(updated_document.chunks)}",
+        )
         return updated_document
 
     def delete_document(self, document_id: DocumentID) -> None:
@@ -287,7 +326,7 @@ class VectorDBService:
         library_id: LibraryID,
         query_text: str,
         k: int = 10,
-        min_similarity: float = 0.0
+        min_similarity: float = 0.0,
     ) -> List[Tuple[Chunk, float]]:
         """Search for chunks in a library"""
         # Validate parameters
@@ -302,12 +341,18 @@ class VectorDBService:
             raise ValueError(f"Library {library_id} not found")
 
         # Create query embedding
-        query_embedding = self.embedding_service.create_embedding(query_text, input_type="search_query")
+        query_embedding = self.embedding_service.create_embedding(
+            query_text, input_type="search_query"
+        )
 
         # Search using index
-        results = self.search_index.search_chunks(library_id, query_embedding, k, min_similarity)
+        results = self.search_index.search_chunks(
+            library_id, query_embedding, k, min_similarity
+        )
 
-        logger.info("Library search completed", lib_id=library_id, results_count=len(results))
+        logger.info(
+            "Library search completed", lib_id=library_id, results_count=len(results)
+        )
         return results
 
     def search_document(
@@ -315,7 +360,7 @@ class VectorDBService:
         document_id: DocumentID,
         query_text: str,
         k: int = 10,
-        min_similarity: float = 0.0
+        min_similarity: float = 0.0,
     ) -> List[Tuple[Chunk, float]]:
         """Search for chunks in a specific document"""
         # Validate parameters
@@ -334,7 +379,9 @@ class VectorDBService:
             return []
 
         # Create query embedding
-        query_embedding = self.embedding_service.create_embedding(query_text, input_type="search_query")
+        query_embedding = self.embedding_service.create_embedding(
+            query_text, input_type="search_query"
+        )
 
         # Get document chunks from the indexing service for this library
         indexing_service = self._get_document_indexing_service(document.library_id)
@@ -345,12 +392,20 @@ class VectorDBService:
             return []
 
         # Search across all chunks in the library but then filter by document
-        all_results = self.search_index.search_chunks(document.library_id, query_embedding, k * 5, min_similarity)
+        all_results = self.search_index.search_chunks(
+            document.library_id, query_embedding, k * 5, min_similarity
+        )
 
         # Filter results to only include chunks from this document
-        results = [(chunk, score) for chunk, score in all_results if chunk.document_id == document_id][:k]
+        results = [
+            (chunk, score)
+            for chunk, score in all_results
+            if chunk.document_id == document_id
+        ][:k]
 
-        logger.info("Document search completed", doc_id=document_id, results_count=len(results))
+        logger.info(
+            "Document search completed", doc_id=document_id, results_count=len(results)
+        )
         return results
 
     # Chunk Operations (Read-only)
@@ -373,7 +428,11 @@ class VectorDBService:
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
-        logger.debug("Retrieved chunks from document", doc_id=document_id, count=len(document.chunks))
+        logger.debug(
+            "Retrieved chunks from document",
+            doc_id=document_id,
+            count=len(document.chunks),
+        )
         return document.chunks
 
     def get_chunks_from_library(self, library_id: LibraryID) -> List[Chunk]:
@@ -383,10 +442,14 @@ class VectorDBService:
         for document in documents:
             chunks.extend(document.chunks)
 
-        logger.debug("Retrieved chunks from library", lib_id=library_id, count=len(chunks))
+        logger.debug(
+            "Retrieved chunks from library", lib_id=library_id, count=len(chunks)
+        )
         return chunks
 
-    def _create_chunks_from_text(self, document_id: DocumentID, text: str, chunk_size: int = 500, metadata=None) -> List[Chunk]:
+    def _create_chunks_from_text(
+        self, document_id: DocumentID, text: str, chunk_size: int = 500, metadata=None
+    ) -> List[Chunk]:
         """Create chunks from text with embeddings (application layer logic)"""
 
         # Use provided metadata or create default
@@ -396,19 +459,18 @@ class VectorDBService:
         chunks = []
 
         for i in range(0, len(text), chunk_size):
-            chunk_text = text[i:i + chunk_size]
+            chunk_text = text[i : i + chunk_size]
             if chunk_text:  # Only create non-empty chunks
                 # Create embedding for this chunk
                 embedding = self.embedding_service.create_embedding(
-                    chunk_text,
-                    input_type="search_document"
+                    chunk_text, input_type="search_document"
                 )
 
                 chunk = Chunk(
                     document_id=document_id,
                     text=chunk_text,
                     embedding=embedding,  # Embedding created here
-                    metadata=metadata  # Inherit document metadata
+                    metadata=metadata,  # Inherit document metadata
                 )
                 chunks.append(chunk)
 

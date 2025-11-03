@@ -20,7 +20,7 @@ from ..schemas import (
     SearchResult,
     ChunkResponse,
     MetadataResponse,
-    ErrorResponse
+    ErrorResponse,
 )
 from ..dependencies import get_vector_db_service
 from ...application.vector_db_service import VectorDBService
@@ -65,7 +65,17 @@ def _to_document_response(document: Document) -> DocumentResponse:
 
 # Library Operations
 
-@router.post("/libraries", response_model=LibraryResponse, status_code=status.HTTP_201_CREATED, responses={409: {"model": ErrorResponse}, 400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
+
+@router.post(
+    "/libraries",
+    response_model=LibraryResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        409: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def create_library(
     request: CreateLibraryRequest,
     vector_db: VectorDBService = Depends(get_vector_db_service),
@@ -77,7 +87,7 @@ async def create_library(
             username=request.username,
             tags=request.tags,
             index_type=request.index_type,
-            index_params=request.index_params
+            index_params=request.index_params,
         )
         return _to_library_response(library)
     except ValueError as e:
@@ -99,7 +109,11 @@ async def create_library(
         )
 
 
-@router.get("/libraries", response_model=List[LibraryResponse], responses={500: {"model": ErrorResponse}})
+@router.get(
+    "/libraries",
+    response_model=List[LibraryResponse],
+    responses={500: {"model": ErrorResponse}},
+)
 async def get_libraries(
     vector_db: VectorDBService = Depends(get_vector_db_service),
 ):
@@ -115,7 +129,11 @@ async def get_libraries(
         )
 
 
-@router.get("/libraries/{library_id}", response_model=LibraryResponse, responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
+@router.get(
+    "/libraries/{library_id}",
+    response_model=LibraryResponse,
+    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+)
 async def get_library(
     library_id: LibraryID,
     vector_db: VectorDBService = Depends(get_vector_db_service),
@@ -201,7 +219,12 @@ async def delete_library(
 
 # Document Operations
 
-@router.post("/libraries/{library_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/libraries/{library_id}/documents",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_document(
     library_id: LibraryID,
     request: CreateDocumentRequest,
@@ -215,7 +238,7 @@ async def create_document(
                 text=request.text,
                 username=request.username,
                 tags=request.tags,
-                chunk_size=request.chunk_size  # Now properly defined in schema
+                chunk_size=request.chunk_size,  # Now properly defined in schema
             )
         else:
             document = vector_db.create_empty_document(
@@ -260,7 +283,9 @@ async def get_documents_in_library(
         )
 
 
-@router.get("/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse)
+@router.get(
+    "/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse
+)
 async def get_document(
     library_id: LibraryID,
     document_id: DocumentID,
@@ -291,7 +316,9 @@ async def get_document(
         )
 
 
-@router.put("/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse)
+@router.put(
+    "/libraries/{library_id}/documents/{document_id}", response_model=DocumentResponse
+)
 async def update_document(
     library_id: LibraryID,
     document_id: DocumentID,
@@ -316,7 +343,7 @@ async def update_document(
         updated_document = vector_db.update_document_content(
             document_id=document_id,
             new_text=request.text,
-            chunk_size=request.chunk_size  # Now properly defined in schema
+            chunk_size=request.chunk_size,  # Now properly defined in schema
         )
         return _to_document_response(updated_document)
     except HTTPException:
@@ -334,7 +361,10 @@ async def update_document(
         )
 
 
-@router.delete("/libraries/{library_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/libraries/{library_id}/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_document(
     library_id: LibraryID,
     document_id: DocumentID,
@@ -373,6 +403,7 @@ async def delete_document(
 
 # Search Operations
 
+
 @router.post("/libraries/{library_id}/search", response_model=SearchResponse)
 async def search_library(
     library_id: LibraryID,
@@ -389,10 +420,10 @@ async def search_library(
             min_similarity=request.min_similarity,
         )
         query_time_ms = (time.time() - start_time) * 1000
-        
+
         # Get total chunks in library for accurate reporting
         total_chunks = len(vector_db.get_chunks_from_library(library_id))
-        
+
         return SearchResponse(
             results=[
                 SearchResult(
@@ -405,14 +436,14 @@ async def search_library(
                             last_update=chunk.metadata.last_update,
                             username=chunk.metadata.username,
                             tags=chunk.metadata.tags,
-                        )
+                        ),
                     ),
-                    similarity_score=similarity
+                    similarity_score=similarity,
                 )
                 for chunk, similarity in results
             ],
             total_chunks_searched=total_chunks,
-            query_time_ms=query_time_ms
+            query_time_ms=query_time_ms,
         )
     except ValueError as e:
         raise HTTPException(
@@ -427,7 +458,10 @@ async def search_library(
         )
 
 
-@router.post("/libraries/{library_id}/documents/{document_id}/search", response_model=SearchResponse)
+@router.post(
+    "/libraries/{library_id}/documents/{document_id}/search",
+    response_model=SearchResponse,
+)
 async def search_document(
     library_id: LibraryID,
     document_id: DocumentID,
@@ -457,10 +491,10 @@ async def search_document(
             min_similarity=request.min_similarity,
         )
         query_time_ms = (time.time() - start_time) * 1000
-        
+
         # Get total chunks in document for accurate reporting
         total_chunks = len(vector_db.get_chunks_from_document(document_id))
-        
+
         return SearchResponse(
             results=[
                 SearchResult(
@@ -474,14 +508,14 @@ async def search_document(
                             last_update=chunk.metadata.last_update,
                             username=chunk.metadata.username,
                             tags=chunk.metadata.tags,
-                        )
+                        ),
                     ),
-                    similarity_score=similarity
+                    similarity_score=similarity,
                 )
                 for chunk, similarity in results
             ],
             total_chunks_searched=total_chunks,
-            query_time_ms=query_time_ms
+            query_time_ms=query_time_ms,
         )
     except HTTPException:
         raise

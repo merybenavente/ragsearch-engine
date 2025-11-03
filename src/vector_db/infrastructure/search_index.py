@@ -23,28 +23,42 @@ class RepositoryAwareSearchIndex(SearchIndex):
 
     def __init__(self, index_factory: IndexFactory):
         self.index_factory = index_factory
-        self._library_indexes: Dict[LibraryID, 'VectorIndex'] = {}
+        self._library_indexes: Dict[LibraryID, "VectorIndex"] = {}
         self._library_index_types: Dict[LibraryID, str] = {}
         self._document_library_mapping: Dict[DocumentID, LibraryID] = {}
         self._lock = RLock()  # Thread safety for concurrent index operations
 
-    def get_library_index(self, library_id: LibraryID) -> 'VectorIndex':
+    def get_library_index(self, library_id: LibraryID) -> "VectorIndex":
         """Get or create the index for a library"""
         with self._lock:
             if library_id not in self._library_indexes:
                 index_type = self._library_index_types.get(library_id, "naive")
-                self._library_indexes[library_id] = self.index_factory.create_index(index_type)
+                self._library_indexes[library_id] = self.index_factory.create_index(
+                    index_type
+                )
                 if library_id not in self._library_index_types:
                     self._library_index_types[library_id] = index_type
             return self._library_indexes[library_id]
 
-    def create_library_index(self, library_id: LibraryID, index_type: str, index_params: Optional[dict] = None) -> None:
+    def create_library_index(
+        self,
+        library_id: LibraryID,
+        index_type: str,
+        index_params: Optional[dict] = None,
+    ) -> None:
         """Create an index for a library"""
         with self._lock:
             params = index_params or {}
-            self._library_indexes[library_id] = self.index_factory.create_index(index_type, **params)
+            self._library_indexes[library_id] = self.index_factory.create_index(
+                index_type, **params
+            )
             self._library_index_types[library_id] = index_type
-            logger.info("Library index created", lib_id=library_id, index_type=index_type, params=params)
+            logger.info(
+                "Library index created",
+                lib_id=library_id,
+                index_type=index_type,
+                params=params,
+            )
 
     def index_document(self, document: Document) -> None:
         """Index a document and all its chunks"""
@@ -53,14 +67,18 @@ class RepositoryAwareSearchIndex(SearchIndex):
             return
 
         with self._lock:
-
             self._document_library_mapping[document.id] = document.library_id
 
             # Get library index and add document chunks
             index = self.get_library_index(document.library_id)
             index.add_chunks(document.id, document.chunks)
 
-            logger.debug("Document indexed", doc_id=document.id, lib_id=document.library_id, chunk_count=len(document.chunks))
+            logger.debug(
+                "Document indexed",
+                doc_id=document.id,
+                lib_id=document.library_id,
+                chunk_count=len(document.chunks),
+            )
 
     def remove_document(self, document_id: DocumentID) -> None:
         """Remove a document and all its chunks from the index"""
@@ -84,13 +102,14 @@ class RepositoryAwareSearchIndex(SearchIndex):
         library_id: LibraryID,
         query_embedding: List[float],
         k: int = 10,
-        min_similarity: float = 0.0
+        min_similarity: float = 0.0,
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks within the specified library"""
         with self._lock:
             index = self.get_library_index(library_id)
             results = index.search(query_embedding, k, min_similarity)
 
-            logger.debug("Chunk search completed", lib_id=library_id, results_count=len(results))
+            logger.debug(
+                "Chunk search completed", lib_id=library_id, results_count=len(results)
+            )
             return results
-

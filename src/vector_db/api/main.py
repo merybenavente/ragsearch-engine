@@ -10,12 +10,13 @@ from ..infrastructure.logging import configure_logging, get_logger
 configure_logging()
 logger = get_logger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     logger.info("Vector Database API starting up", version="0.1.0")
-    
+
     # Check for required environment variables
     if not os.environ.get("COHERE_API_KEY"):
         logger.warning(
@@ -23,16 +24,17 @@ async def lifespan(app: FastAPI):
             "Embedding operations will fail at runtime. "
             "Please set COHERE_API_KEY to use the vector database."
         )
-    
+
     yield
     # Shutdown
     logger.info("Vector Database API shutting down")
+
 
 app = FastAPI(
     title="Vector Database API",
     description="A FastAPI backend for vector database operations with document indexing and similarity search",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -66,13 +68,12 @@ async def health_check():
         "endpoints": {
             "libraries": "/api/v1/libraries",
             "documents": "/api/v1/libraries/{library_id}/documents",
-            "search": "/api/v1/libraries/{library_id}/search"
-        }
+            "search": "/api/v1/libraries/{library_id}/search",
+        },
     }
-
-
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

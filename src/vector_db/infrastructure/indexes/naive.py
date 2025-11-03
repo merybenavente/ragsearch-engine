@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class NaiveIndex(BaseVectorIndex):
     """Naive implementation using linear search with cosine similarity"""
 
-    def _add_chunks_impl(self, chunks: List['Chunk']) -> None:
+    def _add_chunks_impl(self, chunks: List["Chunk"]) -> None:
         """
         Naive index doesn't need special data structures for indexing.
         Chunks are stored in base class and accessed directly during search.
@@ -25,7 +25,9 @@ class NaiveIndex(BaseVectorIndex):
         """
         pass
 
-    def _search_impl(self, query_embedding: List[float], k: int, min_similarity: float) -> List[Tuple['Chunk', float]]:
+    def _search_impl(
+        self, query_embedding: List[float], k: int, min_similarity: float
+    ) -> List[Tuple["Chunk", float]]:
         """Search using linear search with cosine similarity"""
         similarities = []
 
