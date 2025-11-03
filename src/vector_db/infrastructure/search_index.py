@@ -53,13 +53,6 @@ class RepositoryAwareSearchIndex(SearchIndex):
             return
 
         with self._lock:
-            # Track document-library mapping
-            old_library_id = self._document_library_mapping.get(document.id)
-            if old_library_id and old_library_id != document.library_id:
-                # Document moved between libraries - remove from old library index
-                logger.info("Document moved between libraries", doc_id=document.id, old_lib=old_library_id, new_lib=document.library_id)
-                old_index = self.get_library_index(old_library_id)
-                old_index.remove_document(document.id)
 
             self._document_library_mapping[document.id] = document.library_id
 
