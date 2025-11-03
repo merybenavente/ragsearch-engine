@@ -34,6 +34,19 @@ The architecture implements a comprehensive dependency injection pattern where a
 - **Chunks**: Searchable pieces of text with vector embeddings
 - **Metadata**: Timestamps, tags, and user information
 
+### Index Types
+
+The system supports multiple vector index types for different performance characteristics:
+
+- **Naive Index** (`naive`): Simple linear search, good for small datasets
+- **LSH Index** (`lsh`): Locality-Sensitive Hashing for approximate nearest neighbor search
+  - `num_tables`: Number of hash tables (default: 8)
+  - `num_hyperplanes`: Number of hyperplanes per table (default: 6)
+- **VPTree Index** (`vptree`): Vantage Point Tree for exact nearest neighbor search
+  - `leaf_size`: Maximum number of points in leaf nodes (default: varies by implementation)
+
+Configure index type and parameters when creating a library to optimize for your specific use case.
+
 ## Quick Start
 
 ### Prerequisites
@@ -116,7 +129,7 @@ Once running, visit:
     {
       "chunk": {
         "id": "chunk-uuid",
-        "document_id": "doc-uuid", 
+        "document_id": "doc-uuid",
         "text": "chunk content...",
         "embedding": [0.1, 0.2, ...],
         "metadata": {
@@ -145,6 +158,23 @@ curl -X POST "http://localhost:8000/api/v1/libraries/" \
     "name": "My Research Library",
     "username": "researcher",
     "tags": ["research", "papers"]
+  }'
+```
+
+### Create a Library with Custom Index Parameters
+```bash
+# Create a library with LSH index and custom parameters
+curl -X POST "http://localhost:8000/api/v1/libraries/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "High-Performance Library",
+    "username": "researcher",
+    "tags": ["research", "papers"],
+    "index_type": "lsh",
+    "index_params": {
+      "num_tables": 12,
+      "num_hyperplanes": 10
+    }
   }'
 ```
 
