@@ -41,9 +41,9 @@ class TestLSHInitialization:
     def test_default_initialization(self):
         """Test LSH index with default parameters"""
         index = LSHIndex()
-        assert index.num_tables == 8
-        assert index.num_hyperplanes == 6
-        assert len(index.hash_tables) == 8
+        assert index.num_tables == 6
+        assert index.num_hyperplanes == 4
+        assert len(index.hash_tables) == 6
         assert len(index.hyperplanes) == 0
         assert index.vector_dim == 0
 

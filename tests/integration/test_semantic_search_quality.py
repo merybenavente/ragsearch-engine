@@ -2,11 +2,8 @@
 
 import pytest
 import os
-from uuid import uuid4
-import numpy as np
 
 from src.vector_db.api.dependencies import get_vector_db_service
-from src.vector_db.domain.models import Document, Library, Chunk
 
 
 @pytest.mark.integration
@@ -27,7 +24,7 @@ class TestSemanticSearchQuality:
         """Test basic semantic similarity with clear content hierarchy"""
         # Create a library first
         library = self.vector_db_service.create_library(name="Test Library")
-        
+
         # Create a document about a specific, concrete topic
         document = self.vector_db_service.create_document(
             library_id=library.id,
@@ -39,8 +36,8 @@ class TestSemanticSearchQuality:
 
         # Test relative semantic relationships - focus on ranking, not absolute scores
         queries = [
-            "golden retriever dog",      # Exact match - should score highest
-            "friendly family pet",       # Related concept - should score high  
+            "golden retriever dog",     # Exact match - should score highest
+            "friendly family pet",      # Related concept - should score high
             "service animal",           # Related concept - should score medium
             "water repellent coat",     # Specific feature - should score medium
             "hunting birds",            # Related activity - should score lower
@@ -72,7 +69,7 @@ class TestSemanticSearchQuality:
         try:
             # Create a library first
             library = self.vector_db_service.create_library(name="Test Library")
-            
+
             document = self.vector_db_service.create_document(
                 library_id=library.id,
                 text="The automobile industry has revolutionized transportation. Cars have become "
@@ -123,7 +120,7 @@ class TestSemanticSearchQuality:
         """Test that semantic search understands context"""
         # Create a library first
         library = self.vector_db_service.create_library(name="Test Library")
-        
+
         document = self.vector_db_service.create_document(
             library_id=library.id,
             text="Python is a versatile programming language used for web development, "
@@ -163,7 +160,7 @@ class TestSemanticSearchQuality:
         """Test semantic search with multilingual content"""
         # Create a library first
         library = self.vector_db_service.create_library(name="Test Library")
-        
+
         document = self.vector_db_service.create_document(
             library_id=library.id,
             text="La inteligencia artificial es una rama de la informática que busca crear "
@@ -175,7 +172,7 @@ class TestSemanticSearchQuality:
         # Test queries in different languages - use relative comparisons
         multilingual_queries = [
             "artificial intelligence",      # English query for Spanish content
-            "machine learning",            # English query for Spanish content  
+            "machine learning",            # English query for Spanish content
             "inteligencia artificial",     # Spanish query (exact match)
             "aprendizaje automático",      # Spanish query (exact match)
             "cooking recipes",             # Unrelated in English
@@ -246,7 +243,7 @@ class TestSemanticSearchQuality:
         """Test that semantic search properly ranks results by relevance"""
         # Create a library first
         library = self.vector_db_service.create_library(name="Test Library")
-        
+
         document = self.vector_db_service.create_document(
             library_id=library.id,
             text="Python is a high-level programming language known for its simplicity and readability. "
@@ -282,3 +279,59 @@ class TestSemanticSearchQuality:
         # Python programming should be most relevant
         assert python_score >= data_science_score * 0.8, "Python query should be more relevant than data science"
         assert python_score >= web_dev_score * 0.8, "Python query should be more relevant than web development"
+
+    def test_semantic_similarity_lsh_index(self):
+        """Test semantic search using LSH index with custom hyperparameters"""
+        # Create a library with LSH index: 1 bucket, 6 planes
+        library = self.vector_db_service.create_library(
+            name="LSH Test Library",
+            index_type="lsh",
+            index_params={
+                "num_tables": 4,
+                "num_hyperplanes": 2
+            }
+        )
+
+        # Create a document with chunk size 60
+        document = self.vector_db_service.create_document(
+            library_id=library.id,
+            text="Machine learning is a subset of artificial intelligence that uses statistical "
+            "techniques to give computers the ability to learn from data without being "
+            "explicitly programmed. Deep learning uses neural networks with multiple layers "
+            "to model high-level abstractions in data. Natural language processing enables "
+            "computers to understand and generate human language.",
+            chunk_size=60
+        )
+
+        # Test semantic search with LSH index
+        queries = [
+            "machine learning",        # Direct match
+            "artificial intelligence", # Related concept
+            "neural networks",         # Related concept
+            "data processing",         # Somewhat related
+            "cooking recipes",         # Unrelated
+        ]
+
+        print("docs in library", len(self.vector_db_service.get_documents_in_library(library.id)))
+        # Get all scores
+        scores = {}
+        for query in queries:
+            results = self.vector_db_service.search_document(
+                document_id=document.id,
+                query_text=query,
+                k=3,
+                min_similarity=0.0
+            )
+            scores[query] = [chunk_score_tuple[1] for chunk_score_tuple in results if chunk_score_tuple]
+
+        # Test that LSH index provides meaningful semantic ranking
+        assert sum(scores["machine learning"]) > sum(scores["cooking recipes"]), \
+            f"ML terms should score higher than unrelated content with LSH index {scores['machine learning']}"
+        assert sum(scores["artificial intelligence"]) > sum(scores["cooking recipes"]), \
+            "AI terms should score higher than unrelated content with LSH index"
+        assert sum(scores["neural networks"]) > sum(scores["cooking recipes"]), \
+            "Neural network terms should score higher than unrelated content with LSH index"
+
+        # Verify that all queries return results (LSH should not filter out everything)
+        for query in queries:
+            assert all(scores[query]) > 0.0, f"LSH index should return results for query: {query}"

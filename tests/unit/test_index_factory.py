@@ -22,8 +22,8 @@ class TestIndexFactory:
         """Test creating LSH index with default parameters"""
         index = self.factory.create_index("lsh")
         assert isinstance(index, LSHIndex)
-        assert index.num_tables == 8
-        assert index.num_hyperplanes == 6
+        assert index.num_tables == 6
+        assert index.num_hyperplanes == 4
 
     def test_create_lsh_index_custom_params(self):
         """Test creating LSH index with custom parameters via factory"""
@@ -40,7 +40,7 @@ class TestIndexFactory:
         index = self.factory.create_index("lsh", num_tables=10)
         assert isinstance(index, LSHIndex)
         assert index.num_tables == 10
-        assert index.num_hyperplanes == 6  # Default value
+        assert index.num_hyperplanes == 4  # Default value
 
     def test_create_vptree_index(self):
         """Test creating VPTree index"""
