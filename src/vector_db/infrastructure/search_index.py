@@ -3,7 +3,7 @@ Infrastructure implementation of SearchIndex using existing vector indexes.
 
 This bridges the domain SearchIndex interface with the existing infrastructure.
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from threading import RLock
 from ..domain.models import Document, DocumentID, LibraryID, Chunk
 from ..domain.interfaces import SearchIndex
@@ -38,12 +38,13 @@ class RepositoryAwareSearchIndex(SearchIndex):
                     self._library_index_types[library_id] = index_type
             return self._library_indexes[library_id]
 
-    def create_library_index(self, library_id: LibraryID, index_type: str) -> None:
+    def create_library_index(self, library_id: LibraryID, index_type: str, index_params: Optional[dict] = None) -> None:
         """Create an index for a library"""
         with self._lock:
-            self._library_indexes[library_id] = self.index_factory.create_index(index_type)
+            params = index_params or {}
+            self._library_indexes[library_id] = self.index_factory.create_index(index_type, **params)
             self._library_index_types[library_id] = index_type
-            logger.info("Library index created", lib_id=library_id, index_type=index_type)
+            logger.info("Library index created", lib_id=library_id, index_type=index_type, params=params)
 
     def index_document(self, document: Document) -> None:
         """Index a document and all its chunks"""

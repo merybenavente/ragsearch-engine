@@ -14,17 +14,15 @@ AVAILABLE_INDEX_TYPES = ["naive", "lsh", "vptree"]
 
 class IndexFactory:
     """Factory for creating vector indexes"""
-    
-    def create_index(self, index_type: str) -> VectorIndex:
+
+    def create_index(self, index_type: str, **kwargs) -> VectorIndex:
         """Create a vector index of the specified type"""
         if index_type == "naive":
             return NaiveIndex()
         elif index_type == "lsh":
-            # Use parameters optimized for semantic search with high-dimensional embeddings
-            # For 1536-dim embeddings, use fewer hyperplanes for larger buckets = higher recall
-            return LSHIndex(num_tables=8, num_hyperplanes=6)
+            return LSHIndex(**kwargs)
         elif index_type == "vptree":
-            return VPTreeIndex()
+            return VPTreeIndex(**kwargs)
         else:
             logger.warning(f"Unknown index type '{index_type}', defaulting to naive")
             return NaiveIndex()

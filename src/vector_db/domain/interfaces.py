@@ -169,7 +169,7 @@ class SearchIndex(ABC):
         pass
     
     @abstractmethod
-    def create_library_index(self, library_id: LibraryID, index_type: str) -> None:
+    def create_library_index(self, library_id: LibraryID, index_type: str, index_params: Optional[dict] = None) -> None:
         """Create an index for a library"""
         pass
     

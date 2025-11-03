@@ -76,7 +76,8 @@ async def create_library(
             name=request.name,
             username=request.username,
             tags=request.tags,
-            index_type=request.index_type  # Now properly defined in schema
+            index_type=request.index_type,
+            index_params=request.index_params
         )
         return _to_library_response(library)
     except ValueError as e:

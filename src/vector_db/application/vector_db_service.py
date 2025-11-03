@@ -54,7 +54,8 @@ class VectorDBService:
         name: str,
         username: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        index_type: str = "naive"
+        index_type: str = "naive",
+        index_params: Optional[dict] = None
     ) -> Library:
         """Create a new library with search index"""
         # Validate parameters
@@ -74,7 +75,7 @@ class VectorDBService:
         
         # Explicitly create the search index for this library
         # This validates the index type and ensures the index is ready for use
-        self.search_index.create_library_index(library.id, index_type)
+        self.search_index.create_library_index(library.id, index_type, index_params)
         
         # Persist library
         self.library_repo.save(library)

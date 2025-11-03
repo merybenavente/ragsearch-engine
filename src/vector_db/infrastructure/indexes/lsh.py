@@ -38,6 +38,8 @@ class LSHIndex(BaseVectorIndex):
     Trade-offs accuracy for significant performance improvements on large datasets.
     """
 
+    # Use parameters optimized for semantic search with high-dimensional embeddings
+    # For 1536-dim embeddings, use fewer hyperplanes for larger buckets = higher recall
     def __init__(self, num_tables: int = 8, num_hyperplanes: int = 6):
         super().__init__()
         self.num_tables = num_tables

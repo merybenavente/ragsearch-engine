@@ -5,6 +5,7 @@ import threading
 import time
 from uuid import uuid4
 
+from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.indexes.lsh import LSHIndex
 from src.vector_db.domain.models import Chunk
 
@@ -49,6 +50,16 @@ class TestLSHInitialization:
     def test_custom_initialization(self):
         """Test LSH index with custom parameters"""
         index = LSHIndex(num_tables=5, num_hyperplanes=8)
+        assert index.num_tables == 5
+        assert index.num_hyperplanes == 8
+        assert len(index.hash_tables) == 5
+        assert len(index.hyperplanes) == 0
+        assert index.vector_dim == 0
+
+    def test_custom_initialization_via_factory(self):
+        """Test LSH index with custom parameters via factory"""
+        factory = IndexFactory()
+        index = factory.create_index("lsh", num_tables=5, num_hyperplanes=8)
         assert index.num_tables == 5
         assert index.num_hyperplanes == 8
         assert len(index.hash_tables) == 5

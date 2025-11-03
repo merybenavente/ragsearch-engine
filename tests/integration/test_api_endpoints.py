@@ -74,6 +74,62 @@ class TestLibraryEndpoints:
         assert data["document_count"] == 0
         assert data["metadata"]["username"] is None
         assert data["metadata"]["tags"] == []
+    
+    def test_create_library_with_index_params(self):
+        """Test library creation with custom index parameters"""
+        library_data = {
+            "name": "LSH Library with Custom Params",
+            "username": "testuser",
+            "tags": ["lsh", "custom"],
+            "index_type": "lsh",
+            "index_params": {
+                "num_tables": 10,
+                "num_hyperplanes": 8
+            }
+        }
+        
+        response = client.post("/api/v1/libraries", json=library_data)
+        
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == library_data["name"]
+        assert data["document_count"] == 0
+        assert data["metadata"]["username"] == library_data["username"]
+        assert data["metadata"]["tags"] == library_data["tags"]
+    
+    def test_create_library_with_index_params_naive(self):
+        """Test library creation with index params for naive index (should be ignored)"""
+        library_data = {
+            "name": "Naive Library with Params",
+            "index_type": "naive",
+            "index_params": {
+                "some_param": "value"
+            }
+        }
+        
+        response = client.post("/api/v1/libraries", json=library_data)
+        
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == library_data["name"]
+        assert data["document_count"] == 0
+    
+    def test_create_library_with_vptree_params(self):
+        """Test library creation with VPTree index parameters"""
+        library_data = {
+            "name": "VPTree Library",
+            "index_type": "vptree",
+            "index_params": {
+                "leaf_size": 20
+            }
+        }
+        
+        response = client.post("/api/v1/libraries", json=library_data)
+        
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == library_data["name"]
+        assert data["document_count"] == 0
 
     def test_create_document_success(self):
         """Test successful document creation in a library"""

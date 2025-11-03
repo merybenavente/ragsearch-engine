@@ -20,6 +20,7 @@ class CreateLibraryRequest(BaseModel):
     username: Optional[str] = Field(None, description="Username")
     tags: List[str] = Field(default_factory=list, description="Tags")
     index_type: str = Field(default="naive", description="Index type (naive, lsh, vptree)")
+    index_params: Optional[dict] = Field(None, description="Parameters for index creation (e.g., {'num_tables': 10, 'num_hyperplanes': 8} for LSH)")
 
 
 class UpdateLibraryRequest(BaseModel):
