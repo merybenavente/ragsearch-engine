@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,15 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     logger.info("Vector Database API starting up", version="0.1.0")
+    
+    # Check for required environment variables
+    if not os.environ.get("COHERE_API_KEY"):
+        logger.warning(
+            "COHERE_API_KEY not found in environment variables. "
+            "Embedding operations will fail at runtime. "
+            "Please set COHERE_API_KEY to use the vector database."
+        )
+    
     yield
     # Shutdown
     logger.info("Vector Database API shutting down")
