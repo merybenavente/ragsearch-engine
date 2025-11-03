@@ -9,6 +9,8 @@ from ..infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
 
+AVAILABLE_INDEX_TYPES = ["naive", "lsh", "vptree"]
+
 
 class IndexFactory:
     """Factory for creating vector indexes"""

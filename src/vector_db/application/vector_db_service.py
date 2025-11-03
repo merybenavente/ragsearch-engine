@@ -14,6 +14,7 @@ from ..domain.interfaces import (
 )
 from .document_indexing_service import DocumentIndexingService
 from ..infrastructure.logging import get_logger
+from ..infrastructure.index_factory import AVAILABLE_INDEX_TYPES
 
 logger = get_logger(__name__)
 
@@ -60,12 +61,20 @@ class VectorDBService:
         if not name or name.strip() == "":
             raise ValueError("Library name cannot be empty")
         
+        # Validate index type
+        if index_type not in AVAILABLE_INDEX_TYPES:
+            raise ValueError(f"Invalid index type '{index_type}'. Valid types are: {', '.join(AVAILABLE_INDEX_TYPES)}")
+        
         # Check for duplicate names
         existing_libraries = self.library_repo.list_all()
         if any(lib.name == name for lib in existing_libraries):
             raise ValueError(f"Library with name '{name}' already exists")
             
         library = Library.create(name, username, tags, index_type)
+        
+        # Explicitly create the search index for this library
+        # This validates the index type and ensures the index is ready for use
+        self.search_index.create_library_index(library.id, index_type)
         
         # Persist library
         self.library_repo.save(library)
