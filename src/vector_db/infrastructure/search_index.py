@@ -8,6 +8,7 @@ from threading import RLock
 from ..domain.models import Document, DocumentID, LibraryID, Chunk
 from ..domain.interfaces import SearchIndex
 from .index_factory import IndexFactory
+from .indexes.base import VectorIndex
 from ..infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,12 +24,12 @@ class RepositoryAwareSearchIndex(SearchIndex):
 
     def __init__(self, index_factory: IndexFactory):
         self.index_factory = index_factory
-        self._library_indexes: Dict[LibraryID, "VectorIndex"] = {}
+        self._library_indexes: Dict[LibraryID, VectorIndex] = {}
         self._library_index_types: Dict[LibraryID, str] = {}
         self._document_library_mapping: Dict[DocumentID, LibraryID] = {}
         self._lock = RLock()  # Thread safety for concurrent index operations
 
-    def get_library_index(self, library_id: LibraryID) -> "VectorIndex":
+    def get_library_index(self, library_id: LibraryID) -> VectorIndex:
         """Get or create the index for a library"""
         with self._lock:
             if library_id not in self._library_indexes:

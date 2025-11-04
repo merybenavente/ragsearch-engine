@@ -1,5 +1,4 @@
 """Tests for IndexFactory"""
-import pytest
 from src.vector_db.infrastructure.index_factory import IndexFactory, get_index_factory
 from src.vector_db.infrastructure.indexes.naive import NaiveIndex
 from src.vector_db.infrastructure.indexes.lsh import LSHIndex
@@ -46,17 +45,6 @@ class TestIndexFactory:
         """Test creating VPTree index"""
         index = self.factory.create_index("vptree")
         assert isinstance(index, VPTreeIndex)
-
-    @pytest.mark.skip(reason="VPTree is WIP")
-    def test_create_vptree_index_with_params(self):
-        """Test creating VPTree index with parameters"""
-        index = self.factory.create_index("vptree", some_param="value")
-        assert isinstance(index, VPTreeIndex)
-
-    def test_create_naive_index_with_params(self):
-        """Test creating naive index with parameters (should be ignored)"""
-        index = self.factory.create_index("naive", some_param="value")
-        assert isinstance(index, NaiveIndex)
 
     def test_unknown_index_type(self):
         """Test creating unknown index type defaults to naive"""

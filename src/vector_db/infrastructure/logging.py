@@ -52,7 +52,7 @@ def configure_logging(
         processors.append(structlog.dev.ConsoleRenderer())
 
     structlog.configure(
-        processors=processors,
+        processors=processors,  # type: ignore
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, level.value)
         ),

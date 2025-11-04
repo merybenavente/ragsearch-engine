@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict, Any
 from datetime import datetime
 from uuid import uuid4
 
@@ -19,8 +21,8 @@ class Metadata(BaseModel):
     username: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
 
-    def update_timestamp(self) -> "Metadata":
-        """Return a copy with updated last_update timestamp, preserving all other fields"""
+    def update_timestamp(self) -> Metadata:
+        """Return a copy with updated last_update timestamp, preserving all fields"""
         return self.model_copy(update={"last_update": datetime.now()})
 
 
@@ -29,7 +31,8 @@ class Chunk(BaseModel):
     Immutable chunk representing a piece of text with embedding.
 
     Chunks are derived data - they should only be created through document processing,
-    never updated directly. This ensures data integrity between document text and chunks.
+    never updated directly. This ensures data integrity between document text and
+    chunks.
     """
 
     id: ChunkID = Field(default_factory=lambda: str(uuid4()))
@@ -189,7 +192,7 @@ class Library(BaseModel):
         if name is None and tags is None:
             return self
 
-        updates = {}
+        updates: Dict[str, Any] = {}
         if name is not None:
             updates["name"] = name
 
