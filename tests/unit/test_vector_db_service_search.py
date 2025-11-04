@@ -4,8 +4,7 @@ import pytest
 from uuid import uuid4
 
 from src.vector_db.application.vector_db_service import VectorDBService
-from src.vector_db.domain.models import Chunk, Document, EMBEDDING_DIMENSION
-from src.vector_db.domain.interfaces import EmbeddingService
+from src.vector_db.domain.models import Chunk, EMBEDDING_DIMENSION
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
 from src.vector_db.infrastructure.index_factory import get_index_factory
@@ -27,7 +26,7 @@ class TestVectorDBServiceSearch:
             self.repo_manager.get_document_repository(),
             self.repo_manager.get_library_repository(),
             self.search_index,
-            self.embedding_service
+            self.embedding_service,
         )
 
     def test_search_library(self, mock_cohere_deterministic):
@@ -36,7 +35,7 @@ class TestVectorDBServiceSearch:
         library = self.vector_db_service.create_library("Test Library")
         document = self.vector_db_service.create_document(
             library_id=library.id,
-            text="Machine learning is a subset of artificial intelligence that focuses on algorithms."
+            text="Machine learning is a subset of artificial intelligence that focuses on algorithms.",
         )
 
         # Verify document was created and indexed
@@ -47,7 +46,7 @@ class TestVectorDBServiceSearch:
             library_id=library.id,
             query_text="machine learning",  # Use simpler query that should match
             k=5,
-            min_similarity=0.0  # Use 0.0 to get all results
+            min_similarity=0.0,  # Use 0.0 to get all results
         )
 
         assert len(results) > 0
@@ -66,8 +65,7 @@ class TestVectorDBServiceSearch:
 
         with pytest.raises(ValueError, match="Library .* not found"):
             self.vector_db_service.search_library(
-                library_id=fake_library_id,
-                query_text="test query"
+                library_id=fake_library_id, query_text="test query"
             )
 
     def test_search_empty_library(self, mock_cohere_deterministic):
@@ -75,8 +73,7 @@ class TestVectorDBServiceSearch:
         library = self.vector_db_service.create_library("Empty Library")
 
         results = self.vector_db_service.search_library(
-            library_id=library.id,
-            query_text="test query"
+            library_id=library.id, query_text="test query"
         )
 
         assert len(results) == 0
@@ -87,14 +84,14 @@ class TestVectorDBServiceSearch:
         library = self.vector_db_service.create_library(name="Test Library")
         document = self.vector_db_service.create_document(
             library_id=library.id,
-            text="This is a test document about artificial intelligence and machine learning."
+            text="This is a test document about artificial intelligence and machine learning.",
         )
 
         results = self.vector_db_service.search_document(
             document_id=document.id,
             query_text="artificial intelligence",
             k=3,
-            min_similarity=0.0
+            min_similarity=0.0,
         )
 
         assert isinstance(results, list)
@@ -108,20 +105,19 @@ class TestVectorDBServiceSearch:
     def test_search_with_invalid_parameters(self, mock_cohere_deterministic):
         """Test search operations with invalid parameters"""
         library = self.vector_db_service.create_library(name="Test Library")
-        
+
         # Test search with invalid k value
         with pytest.raises(ValueError):
             self.vector_db_service.search_library(
                 library_id=library.id,
                 query_text="test",
-                k=-1  # Invalid k value
+                k=-1,  # Invalid k value
             )
-        
+
         # Test search with empty query
         with pytest.raises(ValueError):
             self.vector_db_service.search_library(
                 library_id=library.id,
                 query_text="",  # Empty query
-                k=5
+                k=5,
             )
-

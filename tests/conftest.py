@@ -4,10 +4,8 @@ import hashlib
 import numpy as np
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
-from src.vector_db.api.main import app
 from src.vector_db.infrastructure.logging import configure_logging, LogLevel
 
 
@@ -26,6 +24,7 @@ def reset_repositories():
     """Reset repository state between tests"""
     # Clear the singleton repository instances using the new architecture
     from src.vector_db.api.dependencies import clear_all_data
+
     clear_all_data()
     yield
 
@@ -37,7 +36,7 @@ def sample_library_data():
         "name": "Test Library",
         "username": "testuser",
         "tags": ["tag1", "tag2"],
-        "index_type": "naive"
+        "index_type": "naive",
     }
 
 
@@ -48,8 +47,9 @@ def sample_document_data():
         "text": "This is a test document with some content that will be chunked.",
         "username": "testuser",
         "tags": ["doc_tag"],
-        "chunk_size": 50
+        "chunk_size": 50,
     }
+
 
 @pytest.fixture
 def mock_cohere_deterministic():
@@ -63,7 +63,8 @@ def mock_cohere_deterministic():
         embedding = np.random.randn(EMBEDDING_DIMENSION)
         return (embedding / np.linalg.norm(embedding)).tolist()
 
-    with patch('src.vector_db.infrastructure.embedding_service.co') as mock_co:
+    with patch("src.vector_db.infrastructure.embedding_service.co") as mock_co:
+
         def mock_embed(texts, **kwargs):
             if isinstance(texts, str):
                 texts = [texts]

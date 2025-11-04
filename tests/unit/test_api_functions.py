@@ -10,12 +10,17 @@ def test_basic_imports():
     try:
         from src.vector_db.domain.models import Document, Library, Metadata
         from src.vector_db.api.main import app
-        assert True
+
+        # Use imports to avoid unused import warnings
+        assert Document is not None
+        assert Library is not None
+        assert Metadata is not None
+        assert app is not None
     except ImportError as e:
         pytest.fail(f"Import failed: {e}")
 
 
-@patch('src.vector_db.infrastructure.embedding_service.co')
+@patch("src.vector_db.infrastructure.embedding_service.co")
 def test_create_document_function(mock_co):
     """Test the create_document service function"""
     # Mock the Cohere API response
@@ -30,19 +35,13 @@ def test_create_document_function(mock_co):
     tags = ["test", "example"]
 
     vector_db_service = get_vector_db_service()
-    
+
     # First create a library
-    library = vector_db_service.create_library(
-        name="Test Library",
-        username="testuser"
-    )
-    
+    library = vector_db_service.create_library(name="Test Library", username="testuser")
+
     # Then create a document
     document = vector_db_service.create_document(
-        library_id=library.id,
-        text=text,
-        username=username,
-        tags=tags
+        library_id=library.id, text=text, username=username, tags=tags
     )
 
     assert document.library_id == library.id
@@ -61,11 +60,7 @@ def test_create_library_function():
     tags = ["test", "example"]
 
     vector_db_service = get_vector_db_service()
-    library = vector_db_service.create_library(
-        name=name,
-        username=username,
-        tags=tags
-    )
+    library = vector_db_service.create_library(name=name, username=username, tags=tags)
 
     assert library.name == name
     assert library.metadata.username == username
@@ -73,7 +68,7 @@ def test_create_library_function():
     assert len(library.document_ids) == 0
 
 
-@patch('src.vector_db.infrastructure.embedding_service.co')
+@patch("src.vector_db.infrastructure.embedding_service.co")
 def test_integration_example(mock_co):
     """Test creating library and adding documents"""
     # Mock the Cohere API response
@@ -84,12 +79,10 @@ def test_integration_example(mock_co):
     from src.vector_db.api.dependencies import get_vector_db_service
 
     vector_db_service = get_vector_db_service()
-    
+
     # Create library
     library = vector_db_service.create_library(
-        name="Music Collection",
-        username="Maria",
-        tags=["personal", "favorites"]
+        name="Music Collection", username="Maria", tags=["personal", "favorites"]
     )
 
     # Create document (this automatically adds it to the library)
@@ -97,7 +90,7 @@ def test_integration_example(mock_co):
         library_id=library.id,
         text="This is a song about the sea",
         username="Maria",
-        tags=["catalan", "indie"]
+        tags=["catalan", "indie"],
     )
 
     # Get updated library to check document was added

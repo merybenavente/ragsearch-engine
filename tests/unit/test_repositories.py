@@ -3,7 +3,11 @@
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
-from src.vector_db.api.dependencies import get_vector_db_service, get_document_repository, get_library_repository
+from src.vector_db.api.dependencies import (
+    get_vector_db_service,
+    get_document_repository,
+    get_library_repository,
+)
 from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 
@@ -34,7 +38,7 @@ class TestDDDRepositories:
         library_ids = [lib.id for lib in libraries]
         assert library.id in library_ids
 
-    @patch('src.vector_db.infrastructure.embedding_service.co')
+    @patch("src.vector_db.infrastructure.embedding_service.co")
     def test_document_repository_operations(self, mock_co):
         """Test basic document repository operations"""
         # Mock the Cohere API response
@@ -45,8 +49,7 @@ class TestDDDRepositories:
         # Create a library and document
         library = self.vector_db_service.create_library(name="Test Library")
         document = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="Test document content"
+            library_id=library.id, text="Test document content"
         )
 
         # Test retrieval
@@ -62,7 +65,7 @@ class TestDDDRepositories:
         document_ids = [doc.id for doc in documents]
         assert document.id in document_ids
 
-    @patch('src.vector_db.infrastructure.embedding_service.co')
+    @patch("src.vector_db.infrastructure.embedding_service.co")
     def test_repository_consistency(self, mock_co):
         """Test that repositories maintain consistency"""
         # Mock the Cohere API response
@@ -91,7 +94,7 @@ class TestDDDRepositories:
         assert retrieved_doc1.library_id == library.id
         assert retrieved_doc2.library_id == library.id
 
-    @patch('src.vector_db.infrastructure.embedding_service.co')
+    @patch("src.vector_db.infrastructure.embedding_service.co")
     def test_delete_operations(self, mock_co):
         """Test delete operations maintain consistency"""
         # Mock the Cohere API response
@@ -102,8 +105,7 @@ class TestDDDRepositories:
         # Create a library with documents
         library = self.vector_db_service.create_library(name="Test Library")
         document = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="Test document"
+            library_id=library.id, text="Test document"
         )
 
         # Verify initial state

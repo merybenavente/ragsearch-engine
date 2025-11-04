@@ -1,7 +1,7 @@
 """Domain interfaces for dependency injection"""
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
-from .models import Document, DocumentID, Library, LibraryID, Chunk, ChunkID
+from .models import Document, DocumentID, Library, LibraryID, Chunk
 
 
 class EmbeddingService(ABC):

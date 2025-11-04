@@ -1,5 +1,5 @@
 """Domain service for document indexing operations"""
-from typing import List, Optional
+from typing import List
 
 from ..domain.models import Document, DocumentID, Chunk
 from ..domain.interfaces import VectorIndex, EmbeddingService

@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from src.vector_db.api.main import app
 

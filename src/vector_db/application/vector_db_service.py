@@ -132,7 +132,7 @@ class VectorDBService:
 
     def delete_library(self, library_id: LibraryID) -> None:
         """Delete a library and all its documents"""
-        library = self._ensure_library_exists(library_id)
+        self._ensure_library_exists(library_id)
 
         # Delete all documents in the library
         documents = self.document_repo.get_by_library(library_id)

@@ -4,9 +4,7 @@ import pytest
 from datetime import datetime
 from uuid import uuid4
 
-from src.vector_db.domain.models import (
-    Chunk, Document, Library, Metadata
-)
+from src.vector_db.domain.models import Chunk, Document, Library, Metadata
 
 
 class TestMetadata:
@@ -40,7 +38,7 @@ class TestMetadata:
         from unittest.mock import patch
         from datetime import datetime
 
-        with patch('src.vector_db.domain.models.datetime') as mock_datetime:
+        with patch("src.vector_db.domain.models.datetime") as mock_datetime:
             later_time = datetime(2025, 12, 31, 23, 59, 59)
             mock_datetime.now.return_value = later_time
 
@@ -95,10 +93,10 @@ class TestChunk:
         original_text = chunk.text
         # Instead of direct assignment (which Pydantic allows),
         # we verify that proper immutable patterns work
-        updated_chunk = chunk.model_copy(update={'text': 'New text'})
+        updated_chunk = chunk.model_copy(update={"text": "New text"})
 
         assert chunk.text == original_text  # Original unchanged
-        assert updated_chunk.text == 'New text'  # New instance has updated value
+        assert updated_chunk.text == "New text"  # New instance has updated value
 
 
 class TestDocument:
@@ -125,7 +123,7 @@ class TestDocument:
 
         # Document with content (manually add a chunk)
         chunk = Chunk(document_id=document.id, text="Some content")
-        document_with_content = document.model_copy(update={'chunks': [chunk]})
+        document_with_content = document.model_copy(update={"chunks": [chunk]})
         assert document_with_content.has_content()
 
     def test_document_get_full_text(self):
@@ -136,7 +134,7 @@ class TestDocument:
         # Add some chunks manually
         chunk1 = Chunk(document_id=document.id, text="First chunk. ")
         chunk2 = Chunk(document_id=document.id, text="Second chunk.")
-        document_with_chunks = document.model_copy(update={'chunks': [chunk1, chunk2]})
+        document_with_chunks = document.model_copy(update={"chunks": [chunk1, chunk2]})
 
         full_text = document_with_chunks.get_full_text()
         assert full_text == "First chunk. Second chunk."
@@ -148,7 +146,7 @@ class TestDocument:
 
         # Add a test chunk
         chunk = Chunk(document_id=document.id, text="Test content")
-        document_with_chunk = document.model_copy(update={'chunks': [chunk]})
+        document_with_chunk = document.model_copy(update={"chunks": [chunk]})
 
         # Get chunk by ID
         found_chunk = document_with_chunk.get_chunk_by_id(chunk.id)
@@ -168,7 +166,7 @@ class TestDocument:
         # Add test chunks
         chunk1 = Chunk(document_id=document.id, text="First chunk")
         chunk2 = Chunk(document_id=document.id, text="Second chunk")
-        document_with_chunks = document.model_copy(update={'chunks': [chunk1, chunk2]})
+        document_with_chunks = document.model_copy(update={"chunks": [chunk1, chunk2]})
 
         chunk_ids = document_with_chunks.get_chunk_ids()
         assert len(chunk_ids) == 2
@@ -266,7 +264,9 @@ class TestLibrary:
         assert updated_library.metadata.tags == new_tags
 
         # Update both
-        updated_library = library.update_metadata(name="Final Library", tags=["final_tag"])
+        updated_library = library.update_metadata(
+            name="Final Library", tags=["final_tag"]
+        )
         assert updated_library.name == "Final Library"
         assert updated_library.metadata.tags == ["final_tag"]
 
@@ -277,7 +277,9 @@ class TestLibrary:
         tags = ["tag1", "tag2"]
         index_type = "lsh"
 
-        library = Library.create(name=name, username=username, tags=tags, index_type=index_type)
+        library = Library.create(
+            name=name, username=username, tags=tags, index_type=index_type
+        )
 
         assert library.name == name
         assert library.metadata.username == username
@@ -319,13 +321,12 @@ class TestLibrary:
     def test_library_timestamp_updates(self):
         """Test that library operations update timestamps"""
         library = Library(name="Test Library")
-        original_time = library.metadata.last_update
 
         # Mock datetime to ensure we can detect timestamp changes
         from unittest.mock import patch
         from datetime import datetime
 
-        with patch('src.vector_db.domain.models.datetime') as mock_datetime:
+        with patch("src.vector_db.domain.models.datetime") as mock_datetime:
             later_time = datetime(2025, 12, 31, 23, 59, 59)
             mock_datetime.now.return_value = later_time
 

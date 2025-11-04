@@ -1,5 +1,4 @@
 """Naive vector index implementation using linear search with cosine similarity"""
-import numpy as np
 from typing import List, Tuple, TYPE_CHECKING
 
 from .base import BaseVectorIndex

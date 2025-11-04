@@ -4,8 +4,6 @@ import pytest
 from uuid import uuid4
 
 from src.vector_db.application.vector_db_service import VectorDBService
-from src.vector_db.domain.models import Chunk, Document, EMBEDDING_DIMENSION
-from src.vector_db.domain.interfaces import EmbeddingService
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
 from src.vector_db.infrastructure.index_factory import get_index_factory
@@ -27,7 +25,7 @@ class TestVectorDBServiceLibrary:
             self.repo_manager.get_document_repository(),
             self.repo_manager.get_library_repository(),
             self.search_index,
-            self.embedding_service
+            self.embedding_service,
         )
 
     def test_create_library(self, mock_cohere_deterministic):
@@ -38,10 +36,7 @@ class TestVectorDBServiceLibrary:
         index_type = "naive"
 
         library = self.vector_db_service.create_library(
-            name=name,
-            username=username,
-            tags=tags,
-            index_type=index_type
+            name=name, username=username, tags=tags, index_type=index_type
         )
 
         assert library.name == name
@@ -75,9 +70,7 @@ class TestVectorDBServiceLibrary:
         new_tags = ["updated", "tags"]
 
         updated_library = self.vector_db_service.update_library_metadata(
-            library_id=library.id,
-            name=new_name,
-            tags=new_tags
+            library_id=library.id, name=new_name, tags=new_tags
         )
 
         assert updated_library.name == new_name
@@ -93,8 +86,7 @@ class TestVectorDBServiceLibrary:
         # Create library with document
         library = self.vector_db_service.create_library("Test Library")
         document = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="Test document content"
+            library_id=library.id, text="Test document content"
         )
 
         # Delete library
@@ -109,8 +101,8 @@ class TestVectorDBServiceLibrary:
     def test_list_libraries(self, mock_cohere_deterministic):
         """Test listing all libraries"""
         # Create a few libraries
-        lib1 = self.vector_db_service.create_library(name="Library 1")
-        lib2 = self.vector_db_service.create_library(name="Library 2")
+        self.vector_db_service.create_library(name="Library 1")
+        self.vector_db_service.create_library(name="Library 2")
 
         libraries = self.vector_db_service.list_libraries()
 
@@ -126,12 +118,10 @@ class TestVectorDBServiceLibrary:
 
         # Create multiple documents
         doc1 = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="First document content"
+            library_id=library.id, text="First document content"
         )
         doc2 = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="Second document content"
+            library_id=library.id, text="Second document content"
         )
 
         # Get all documents
@@ -147,11 +137,10 @@ class TestVectorDBServiceLibrary:
         # Test create library with empty name
         with pytest.raises(ValueError):
             self.vector_db_service.create_library(name="")
-        
+
         # Test update library with invalid ID
         fake_id = str(uuid4())
         with pytest.raises(ValueError):
             self.vector_db_service.update_library_metadata(
-                library_id=fake_id,
-                name="Updated Name"
+                library_id=fake_id, name="Updated Name"
             )
