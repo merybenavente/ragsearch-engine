@@ -1,6 +1,28 @@
-"""VP-Tree (Vantage Point Tree) vector index implementation"""
+"""
+VP-Tree (Vantage Point Tree) vector index implementation
+
+VP-Tree is an exact nearest neighbor search data structure for metric spaces.
+It recursively partitions the space using vantage points and distance thresholds,
+creating a binary tree that enables efficient pruning during search.
+
+Algorithm Overview:
+1. Select a random vantage point from the dataset
+2. Calculate distances from vantage point to all other points
+3. Choose median distance as threshold to split points into two groups
+4. Recursively build left subtree (closer points) and right subtree (farther points)
+5. For search, use triangle inequality to prune entire subtrees
+
+Time Complexity:
+- Building: O(n log n) where n=number of vectors
+- Search: O(log n) expected, O(n) worst case
+- Space: O(n)
+
+Parameters:
+- leaf_size: Minimum number of points in leaf nodes (unused in current implementation)
+- random_seed: Seed for deterministic vantage point selection
+"""
 import heapq
-import random
+import numpy as np
 from typing import List, Tuple, Optional, TYPE_CHECKING
 
 from .base import BaseVectorIndex
@@ -26,7 +48,7 @@ class VPTreeIndex(BaseVectorIndex):
         super().__init__()
         self.leaf_size = leaf_size
         self.root: Optional[VPTreeNode] = None
-        self._rng = random.Random(42)
+        self._rng = np.random.RandomState(42)
 
     def _distance(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate distance between two embeddings (1 - cosine similarity)"""
@@ -44,7 +66,8 @@ class VPTreeIndex(BaseVectorIndex):
         # Choose vantage point (deterministic random selection)
         # Make a copy to avoid modifying the input list
         chunks_copy = chunks.copy()
-        vantage_point = self._rng.choice(chunks_copy)
+        vantage_point_idx = self._rng.choice(len(chunks_copy))
+        vantage_point = chunks_copy[vantage_point_idx]
         chunks_copy.remove(vantage_point)
 
         if not chunks_copy:
