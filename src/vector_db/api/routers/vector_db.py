@@ -42,7 +42,7 @@ def _to_library_response(library: Library) -> LibraryResponse:
             username=library.metadata.username,
             tags=library.metadata.tags,
         ),
-        document_count=len(library.document_ids),  # Fixed to use document_ids
+        document_count=len(library.document_ids),
     )
 
 

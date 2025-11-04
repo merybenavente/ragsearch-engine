@@ -82,10 +82,18 @@ The API will be available at `http://localhost:8000`
 docker build -f docker/Dockerfile -t vector-db .
 ```
 
-2. Run the container:
+2. Set up environment variables:
 ```bash
-docker run -p 8000:8000 vector-db
+# Create .env file with your API key
+echo "COHERE_API_KEY=your_api_key_here" > .env
 ```
+
+3. Run the container:
+```bash
+docker run -p 8000:8000 --env-file .env vector-db
+```
+
+**Note**: The COHERE_API_KEY is required for document creation as it generates embeddings for text chunks.
 
 ## API Documentation
 
@@ -152,7 +160,7 @@ Once running, visit:
 
 ### Create a Library
 ```bash
-curl -X POST "http://localhost:8000/api/v1/libraries/" \
+curl -X POST "http://localhost:8000/api/v1/libraries" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Research Library",
@@ -164,7 +172,7 @@ curl -X POST "http://localhost:8000/api/v1/libraries/" \
 ### Create a Library with Custom Index Parameters
 ```bash
 # Create a library with LSH index and custom parameters
-curl -X POST "http://localhost:8000/api/v1/libraries/" \
+curl -X POST "http://localhost:8000/api/v1/libraries" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "High-Performance Library",
@@ -180,7 +188,7 @@ curl -X POST "http://localhost:8000/api/v1/libraries/" \
 
 ### Add a Document
 ```bash
-curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/" \
+curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/documents" \
   -H "Content-Type: application/json" \
   -d '{
     "text": "This is my research document content...",
@@ -192,7 +200,7 @@ curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/" \
 ### Search for Similar Content
 ```bash
 # Search within a library
-curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/search" \
+curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/search" \
   -H "Content-Type: application/json" \
   -d '{
     "query_text": "machine learning neural networks",
@@ -200,7 +208,7 @@ curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/search" \
   }'
 
 # Search within a specific document
-curl -X POST "http://localhost:8000/api/v1/libraries/{library_id}/documents/{document_id}/search" \
+curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/documents/${DOCUMENT_ID}/search" \
   -H "Content-Type: application/json" \
   -d '{
     "query_text": "machine learning neural networks",

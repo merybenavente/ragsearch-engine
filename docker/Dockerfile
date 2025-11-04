@@ -24,7 +24,7 @@ RUN pip install poetry
 COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies
-RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
+RUN poetry install --no-root
 
 # Copy application code
 COPY ./src ./src
@@ -34,4 +34,3 @@ EXPOSE 8000
 
 # Command to run the application
 CMD ["poetry", "run", "uvicorn", "src.vector_db.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
