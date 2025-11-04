@@ -18,7 +18,7 @@ class TestSemanticSearchQuality:
 
         # Skip tests if COHERE_API_KEY is not set
         if not os.getenv("COHERE_API_KEY"):
-            pytest.skip("COHERE_API_KEY environment variable not set")
+            pytest.fail("COHERE_API_KEY environment variable not set")
 
     def test_semantic_similarity_basic(self):
         """Test basic semantic similarity with clear content hierarchy"""
