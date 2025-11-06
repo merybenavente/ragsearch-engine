@@ -17,21 +17,16 @@ class IndexFactory:
 
     def create_index(self, index_type: str, **kwargs) -> VectorIndex:
         """Create a vector index of the specified type"""
-        if index_type == "naive":
-            return NaiveIndex()
-        elif index_type == "lsh":
-            return LSHIndex(**kwargs)
-        elif index_type == "vptree":
-            return VPTreeIndex(**kwargs)
-        else:
-            logger.warning(f"Unknown index type '{index_type}', defaulting to naive")
-            return NaiveIndex()
-
-
-# Global factory instance
-index_factory = IndexFactory()
-
-
-def get_index_factory() -> IndexFactory:
-    """Get the global index factory instance"""
-    return index_factory
+        match index_type:
+            case "naive":
+                return NaiveIndex()
+            case "lsh":
+                return LSHIndex(**kwargs)
+            case "vptree":
+                return VPTreeIndex(**kwargs)
+            case _:
+                # TODO: it think I prefer to return an error than silently fallback to Naive
+                logger.warning(
+                    f"Unknown index type '{index_type}', defaulting to naive"
+                )
+                return NaiveIndex()

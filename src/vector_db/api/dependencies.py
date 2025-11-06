@@ -2,7 +2,7 @@
 from ..infrastructure.repositories import RepositoryManager
 from ..infrastructure.embedding_service import CohereEmbeddingService
 from ..infrastructure.search_index import RepositoryAwareSearchIndex
-from ..infrastructure.index_factory import get_index_factory
+from ..infrastructure.index_factory import IndexFactory
 from ..application.vector_db_service import VectorDBService
 from ..domain.interfaces import (
     DocumentRepository,
@@ -19,7 +19,7 @@ _repo_manager = RepositoryManager()
 _document_repository: DocumentRepository = _repo_manager.get_document_repository()
 _library_repository: LibraryRepository = _repo_manager.get_library_repository()
 _embedding_service: EmbeddingService = CohereEmbeddingService()
-_index_factory = get_index_factory()
+_index_factory = IndexFactory()
 _search_index: SearchIndex = RepositoryAwareSearchIndex(_index_factory)
 _vector_db_service = VectorDBService(
     _document_repository, _library_repository, _search_index, _embedding_service

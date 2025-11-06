@@ -1,5 +1,5 @@
 """Tests for IndexFactory"""
-from src.vector_db.infrastructure.index_factory import IndexFactory, get_index_factory
+from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.indexes.naive import NaiveIndex
 from src.vector_db.infrastructure.indexes.lsh import LSHIndex
 from src.vector_db.infrastructure.indexes.vptree import VPTreeIndex
@@ -55,12 +55,3 @@ class TestIndexFactory:
         """Test creating unknown index type with params defaults to naive"""
         index = self.factory.create_index("unknown", some_param="value")
         assert isinstance(index, NaiveIndex)
-
-    def test_get_index_factory(self):
-        """Test getting global factory instance"""
-        factory = get_index_factory()
-        assert isinstance(factory, IndexFactory)
-
-        # Should return the same instance
-        factory2 = get_index_factory()
-        assert factory is factory2

@@ -6,7 +6,7 @@ from uuid import uuid4
 from src.vector_db.application.vector_db_service import VectorDBService
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
-from src.vector_db.infrastructure.index_factory import get_index_factory
+from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.embedding_service import CohereEmbeddingService
 
 
@@ -17,7 +17,7 @@ class TestVectorDBServiceLibrary:
         """Setup test fixtures"""
         # Setup repositories
         self.repo_manager = RepositoryManager()
-        self.search_index = RepositoryAwareSearchIndex(get_index_factory())
+        self.search_index = RepositoryAwareSearchIndex(IndexFactory())
         self.embedding_service = CohereEmbeddingService()
 
         # Create VectorDBService instance

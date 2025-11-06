@@ -8,7 +8,7 @@ from src.vector_db.domain.models import Document, EMBEDDING_DIMENSION
 from src.vector_db.domain.interfaces import EmbeddingService
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
-from src.vector_db.infrastructure.index_factory import get_index_factory
+from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.embedding_service import CohereEmbeddingService
 
 
@@ -19,7 +19,7 @@ class TestVectorDBServiceDocument:
         """Setup test fixtures"""
         # Setup repositories
         self.repo_manager = RepositoryManager()
-        self.search_index = RepositoryAwareSearchIndex(get_index_factory())
+        self.search_index = RepositoryAwareSearchIndex(IndexFactory())
         self.embedding_service = CohereEmbeddingService()
 
         # Create VectorDBService instance
