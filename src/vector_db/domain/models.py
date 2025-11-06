@@ -41,11 +41,6 @@ class Chunk(BaseModel):
     embedding: List[float] = Field(default_factory=list)
     metadata: Metadata = Field(default_factory=Metadata)
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        # Embedding should be provided explicitly during chunk creation
-        # If not provided, it will remain empty (to be filled by application layer)
-
 
 class Document(BaseModel):
     """
