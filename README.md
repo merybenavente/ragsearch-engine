@@ -139,7 +139,6 @@ Once running, visit:
         "id": "chunk-uuid",
         "document_id": "doc-uuid",
         "text": "chunk content...",
-        "embedding": [0.1, 0.2, ...],
         "metadata": {
           "creation_time": "2023-01-01T00:00:00Z",
           "last_update": "2023-01-01T00:00:00Z",
@@ -230,10 +229,6 @@ Run the full test suite (including slow semantic quality tests, and which needs 
 poetry run pytest
 ```
 
-Run with coverage:
-```bash
-poetry run pytest --cov=src/vector_db --cov-report=html -m "not semantic_quality"
-```
 
 Run specific test categories:
 ```bash
@@ -250,33 +245,14 @@ poetry run pytest -m semantic_quality
 poetry run pytest tests/unit/test_domain_models.py
 ```
 
-### Test Structure
-
-- **Unit Tests** (`tests/unit/`):
-  - `test_domain_models.py` - Domain model functionality
-  - `test_document_service.py` - Document service operations
-  - `test_library_service.py` - Library service operations
-  - `test_chunk_service.py` - Chunk service operations
-  - `test_search_service_integration.py` - Search service integration
-  - `test_repositories.py` - Repository operations and thread safety
-  - `test_search_service.py` - Search service unit tests
-  - `test_api_functions.py` - API function tests
-
-- **Integration Tests** (`tests/integration/`):
-  - `test_api_endpoints.py` - Full API endpoint testing
-  - `test_main.py` - Main application testing
-  - `test_semantic_search_quality.py` - Semantic search quality (slow, requires API key)
+More information in the [Testing Strategy README](tests/README.md).
 
 ### Code Quality
 
-Format code:
+Format and lint code:
 ```bash
-poetry run black src/ tests/
-```
-
-Lint code:
-```bash
-poetry run flake8 src/ tests/
+poetry run ruff format src/ tests/
+poetry run ruff check src/ tests/
 ```
 
 Type checking:
@@ -284,7 +260,7 @@ Type checking:
 poetry run mypy src/
 ```
 
-Pre-commit hooks are configured to run linting and formatting automatically on each commit.
+Pre-commit hooks are configured to run ruff formatting, linting, and mypy type checking automatically on each commit.
 
 ### Logging
 
@@ -308,35 +284,3 @@ Logs include:
 - Error context and stack traces
 - Thread safety operations
 - Business logic events
-
-## Technical Details
-
-### Domain Models
-
-- **Immutable Design**: Models use Pydantic's `model_copy()` for updates
-- **Automatic Chunking**: Documents automatically split text into chunks
-- **Embedding Generation**: Each chunk gets a vector embedding.
-- **Metadata Tracking**: Creation time, last update, tags, and user information
-
-### Thread Safety
-
-- **Repository Locking**: Thread-safe operations using `RLock`
-- **Concurrent Testing**: Comprehensive concurrent access testing
-- **Performance Monitoring**: Lock contention and operation timing
-
-### Data Flow
-
-1. **Document Creation**: Text → Automatic Chunking → Embedding Generation
-2. **Storage**: Thread-safe in-memory storage with proper locking
-3. **Retrieval**: Fast lookup by ID with O(1) access patterns
-4. **Updates**: Immutable updates with timestamp tracking
-
-## Future Enhancements
-
-- **Vector Search**: k-nearest neighbor search implementation
-- **Multiple Index Types**: LSH, hierarchical clustering, etc.
-- **Real Embeddings**: Integration with embedding models (OpenAI, Sentence Transformers)
-- **Persistent Storage**: Database integration (PostgreSQL with pgvector)
-- **Search API**: Similarity search endpoints
-- **Authentication**: User authentication and authorization
-- **Rate Limiting**: API rate limiting and quotas

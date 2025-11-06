@@ -12,8 +12,14 @@ tests/
 ├── unit/                               # Unit tests for isolated components
 │   ├── test_domain_models.py           # Domain model tests (Chunk, Document, Library)
 │   ├── test_repositories.py            # Repository layer tests
-│   ├── test_vector_db_service_*.py     # Service layer tests (split by functionality)
-│   └── test_api_functions.py           # Basic API function tests
+│   ├── test_vector_db_service_document.py  # Document service tests
+│   ├── test_vector_db_service_library.py   # Library service tests
+│   ├── test_vector_db_service_search.py    # Search service tests
+│   ├── test_vector_db_service_integration.py # Service integration tests
+│   ├── test_api_functions.py           # Basic API function tests
+│   ├── test_index_factory.py           # Index factory tests
+│   ├── test_lsh_index.py               # LSH index implementation tests
+│   └── test_vptree_index.py            # VPTree index implementation tests
 └── integration/                        # Integration and end-to-end tests
     ├── test_api_endpoints.py           # API endpoint integration tests
     ├── test_complete_workflow.py       # End-to-end workflow tests
@@ -175,7 +181,7 @@ pytest tests/integration/test_semantic_search_quality.py
 ### Coverage Targets
 - **Unit Tests**: 90%+ code coverage
 - **Integration Tests**: 80%+ critical path coverage
-- **Overall**: 85%+ combined coverage
+- **Overall**: 80%+ combined coverage
 
 ### Coverage Areas
 - ✅ Domain models (Chunk, Document, Library, Metadata)
@@ -183,9 +189,7 @@ pytest tests/integration/test_semantic_search_quality.py
 - ✅ Repository layer (DocumentRepository, LibraryRepository)
 - ✅ API endpoints
 - ✅ Search functionality
-- ⚠️ Index implementations (LSH, VPTree) - **WIP**
-- ⚠️ Error recovery scenarios - **WIP**
-- ⚠️ Performance characteristics - **WIP**
+- ✅ Index implementations (LSH, VPTree, Index Factory)
 
 
 ### Test Debugging

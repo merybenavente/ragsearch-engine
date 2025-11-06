@@ -15,7 +15,6 @@ from ..infrastructure.logging import get_logger
 
 logger = get_logger(__name__)
 
-# New DDD Architecture (Recommended)
 _repo_manager = RepositoryManager()
 _document_repository: DocumentRepository = _repo_manager.get_document_repository()
 _library_repository: LibraryRepository = _repo_manager.get_library_repository()
@@ -27,7 +26,6 @@ _vector_db_service = VectorDBService(
 )
 
 
-# New DDD Architecture Dependencies
 def get_vector_db_service() -> VectorDBService:
     """Dependency injection for the main VectorDB service (recommended)"""
     return _vector_db_service
