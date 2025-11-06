@@ -1,4 +1,5 @@
 """Tests for IndexFactory"""
+import pytest
 from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.indexes.naive import NaiveIndex
 from src.vector_db.infrastructure.indexes.lsh import LSHIndex
@@ -46,12 +47,12 @@ class TestIndexFactory:
         index = self.factory.create_index("vptree")
         assert isinstance(index, VPTreeIndex)
 
-    def test_unknown_index_type(self):
-        """Test creating unknown index type defaults to naive"""
-        index = self.factory.create_index("unknown")
-        assert isinstance(index, NaiveIndex)
+    def test_unknown_index_type_raises_error(self):
+        """Test creating unknown index type raises ValueError"""
+        with pytest.raises(ValueError, match="Unknown index type 'unknown'"):
+            self.factory.create_index("unknown")
 
-    def test_unknown_index_type_with_params(self):
-        """Test creating unknown index type with params defaults to naive"""
-        index = self.factory.create_index("unknown", some_param="value")
-        assert isinstance(index, NaiveIndex)
+    def test_unknown_index_type_with_params_raises_error(self):
+        """Test creating unknown index type with params raises ValueError"""
+        with pytest.raises(ValueError, match="Unknown index type 'typo'"):
+            self.factory.create_index("typo", some_param="value")

@@ -25,8 +25,6 @@ class IndexFactory:
             case "vptree":
                 return VPTreeIndex(**kwargs)
             case _:
-                # TODO: it think I prefer to return an error than silently fallback to Naive
-                logger.warning(
-                    f"Unknown index type '{index_type}', defaulting to naive"
+                raise ValueError(
+                    f"Unknown index type '{index_type}'. Available types: {AVAILABLE_INDEX_TYPES}"
                 )
-                return NaiveIndex()
