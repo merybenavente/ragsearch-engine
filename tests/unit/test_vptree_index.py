@@ -9,14 +9,51 @@ class TestVPTreeSpecific:
     """Test VPTree-specific functionality that differs from other indexes"""
 
     def test_vptree_node_structure(self):
-        """Test VPTreeNode has correct structure"""
+        """Test VPTreeNode has correct structure for internal nodes"""
         chunk = Chunk(id="test", document_id="doc1", text="test", embedding=[1.0, 2.0])
-        node = VPTreeNode(chunk, threshold=0.5)
+        node = VPTreeNode([chunk], threshold=0.5, is_leaf=False)
 
         assert node.chunk == chunk
+        assert node.chunks is None
         assert node.threshold == 0.5
+        assert node.is_leaf is False
         assert node.left is None
         assert node.right is None
+
+    def test_vptree_leaf_node_structure(self):
+        """Test VPTreeNode has correct structure for leaf nodes"""
+        chunks = [
+            Chunk(id="test1", document_id="doc1", text="test1", embedding=[1.0, 2.0]),
+            Chunk(id="test2", document_id="doc1", text="test2", embedding=[2.0, 1.0]),
+        ]
+        node = VPTreeNode(chunks, threshold=0.0, is_leaf=True)
+
+        assert node.chunks == chunks
+        assert node.threshold == 0.0
+        assert node.is_leaf is True
+        assert node.left is None
+        assert node.right is None
+
+    def test_leaf_size_parameter(self):
+        """Test that leaf_size parameter is used correctly"""
+        index = VPTreeIndex(leaf_size=3)
+        assert index.leaf_size == 3
+
+        # Create chunks that should form a leaf when <= leaf_size
+        chunks = [
+            Chunk(id="1", document_id="doc1", text="text1", embedding=[1.0, 0.0]),
+            Chunk(id="2", document_id="doc1", text="text2", embedding=[0.0, 1.0]),
+        ]
+
+        for chunk in chunks:
+            index._chunks[chunk.id] = chunk
+
+        index._add_chunks_impl(chunks)
+
+        # With only 2 chunks and leaf_size=3, root should be a leaf
+        assert index.root is not None
+        assert index.root.is_leaf is True
+        assert len(index.root.chunks) == 2
 
     def test_distance_is_one_minus_cosine(self):
         """Test that VPTree uses 1 - cosine_similarity as distance metric"""

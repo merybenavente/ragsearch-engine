@@ -13,12 +13,12 @@ Algorithm Overview:
 5. For search, use triangle inequality to prune entire subtrees
 
 Time Complexity:
-- Building: O(n log n) where n=number of vectors
-- Search: O(log n) expected, O(n) worst case
+- Building: O(n log n × d) where n=number of vectors, d=embedding dimension
+- Search: O(log n × d) expected, O(n × d) worst case
 - Space: O(n)
 
 Parameters:
-- leaf_size: Minimum number of points in leaf nodes (unused in current implementation)
+- leaf_size: Minimum number of points in leaf nodes (default: 20)
 - random_seed: Seed for deterministic vantage point selection
 """
 import heapq
@@ -34,11 +34,22 @@ if TYPE_CHECKING:
 class VPTreeNode:
     """Node in a VP-Tree"""
 
-    def __init__(self, chunk: "Chunk", threshold: float = 0.0):
-        self.chunk = chunk
+    def __init__(
+        self, chunks: List["Chunk"], threshold: float = 0.0, is_leaf: bool = False
+    ):
         self.threshold = threshold
+        self.is_leaf = is_leaf
         self.left: Optional["VPTreeNode"] = None
         self.right: Optional["VPTreeNode"] = None
+        self.chunks: Optional[List["Chunk"]]
+        self.chunk: Optional["Chunk"]
+
+        if is_leaf:
+            self.chunks = chunks
+            self.chunk = None
+        else:
+            self.chunk = chunks[0] if chunks else None
+            self.chunks = None
 
 
 class VPTreeIndex(BaseVectorIndex):
@@ -60,8 +71,8 @@ class VPTreeIndex(BaseVectorIndex):
         if not chunks:
             return None
 
-        if len(chunks) == 1:
-            return VPTreeNode(chunks[0])
+        if len(chunks) <= self.leaf_size:
+            return VPTreeNode(chunks, is_leaf=True)
 
         # Choose vantage point (deterministic random selection)
         # Make a copy to avoid modifying the input list
@@ -71,7 +82,7 @@ class VPTreeIndex(BaseVectorIndex):
         chunks_copy.remove(vantage_point)
 
         if not chunks_copy:
-            return VPTreeNode(vantage_point)
+            return VPTreeNode([vantage_point], is_leaf=True)
 
         # Calculate distances from vantage point to all other chunks
         distances = []
@@ -81,7 +92,7 @@ class VPTreeIndex(BaseVectorIndex):
                 distances.append((dist, chunk))
 
         if not distances:
-            return VPTreeNode(vantage_point)
+            return VPTreeNode([vantage_point], is_leaf=True)
 
         # Sort by distance and find median point's distance as threshold
         distances.sort(key=lambda x: x[0])
@@ -105,7 +116,7 @@ class VPTreeIndex(BaseVectorIndex):
             threshold = distances[mid - 1][0] if mid > 0 else 0.0
 
         # Create node and recursively build subtrees
-        node = VPTreeNode(vantage_point, threshold)
+        node = VPTreeNode([vantage_point], threshold, is_leaf=False)
         node.left = self._build_tree(left_chunks)
         node.right = self._build_tree(right_chunks)
 
@@ -152,7 +163,26 @@ class VPTreeIndex(BaseVectorIndex):
         results: List[Tuple[float, "Chunk"]],
     ) -> None:
         """Recursively search VP-Tree with proper pruning"""
-        if not node or not node.chunk.embedding:
+        if not node:
+            return
+
+        # Handle leaf nodes
+        if node.is_leaf and node.chunks:
+            for chunk in node.chunks:
+                if chunk.embedding:
+                    similarity = self._cosine_similarity(
+                        query_embedding, chunk.embedding
+                    )
+                    if similarity >= min_similarity:
+                        # Use max-heap for efficient k-NN (negate similarity for max-heap)
+                        if len(results) < k:
+                            heapq.heappush(results, (-similarity, chunk))
+                        elif -similarity > results[0][0]:  # Better than worst in heap
+                            heapq.heapreplace(results, (-similarity, chunk))
+            return
+
+        # Handle internal nodes
+        if not node.chunk or not node.chunk.embedding:
             return
 
         # Calculate similarity to vantage point
