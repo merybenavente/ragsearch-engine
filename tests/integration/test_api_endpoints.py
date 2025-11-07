@@ -1,26 +1,12 @@
 """Integration tests for API endpoints"""
 
-import pytest
 from fastapi.testclient import TestClient
 from fastapi import status
 from uuid import uuid4
-from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
-from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 client = TestClient(app)
-
-
-# Mock Cohere embedding service for integration tests
-@pytest.fixture(autouse=True)
-def mock_cohere_embedding_service():
-    """Mock the Cohere embedding service for integration tests"""
-    with patch("src.vector_db.infrastructure.embedding_service.co") as mock_co:
-        mock_response = MagicMock()
-        mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]  # Mock embedding
-        mock_co.embed.return_value = mock_response
-        yield mock_co
 
 
 class TestHealthEndpoints:
@@ -124,7 +110,7 @@ class TestLibraryEndpoints:
         assert data["name"] == library_data["name"]
         assert data["document_count"] == 0
 
-    def test_create_document_success(self):
+    def test_create_document_success(self, mock_cohere_deterministic):
         """Test successful document creation in a library"""
         # First create a library
         library_data = {"name": "Document Test Library"}
@@ -154,7 +140,7 @@ class TestLibraryEndpoints:
         assert data["metadata"]["username"] == document_data["username"]
         assert data["metadata"]["tags"] == document_data["tags"]
 
-    def test_search_library(self):
+    def test_search_library(self, mock_cohere_deterministic):
         """Test searching within a library"""
         # Create library and document
         library_data = {"name": "Search Test Library"}
@@ -321,7 +307,9 @@ class TestLibraryEndpoints:
 class TestDocumentEndpoints:
     """Test cases for document endpoints"""
 
-    def test_create_document_success(self, sample_library_data, sample_document_data):
+    def test_create_document_success(
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
+    ):
         """Test successful document creation"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -362,7 +350,9 @@ class TestDocumentEndpoints:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_get_documents_in_library(self, sample_library_data, sample_document_data):
+    def test_get_documents_in_library(
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
+    ):
         """Test getting documents in a library"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -381,7 +371,7 @@ class TestDocumentEndpoints:
         assert data[0]["library_id"] == library_id
 
     def test_get_document_by_id_success(
-        self, sample_library_data, sample_document_data
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
     ):
         """Test getting document by ID successfully"""
         # Create library and document
@@ -414,7 +404,9 @@ class TestDocumentEndpoints:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_document_success(self, sample_library_data, sample_document_data):
+    def test_update_document_success(
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
+    ):
         """Test successful document update"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -437,7 +429,9 @@ class TestDocumentEndpoints:
         data = response.json()
         assert data["id"] == document_id
 
-    def test_delete_document_success(self, sample_library_data, sample_document_data):
+    def test_delete_document_success(
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
+    ):
         """Test successful document deletion"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -464,7 +458,9 @@ class TestDocumentEndpoints:
 class TestSearchEndpoints:
     """Test cases for search endpoints"""
 
-    def test_search_document_success(self, sample_library_data, sample_document_data):
+    def test_search_document_success(
+        self, mock_cohere_deterministic, sample_library_data, sample_document_data
+    ):
         """Test successful document-specific search"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -505,7 +501,9 @@ class TestSearchEndpoints:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_search_empty_document(self, sample_library_data):
+    def test_search_empty_document(
+        self, mock_cohere_deterministic, sample_library_data
+    ):
         """Test search in document with no content"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -529,7 +527,9 @@ class TestSearchEndpoints:
         data = response.json()
         assert data["results"] == []
 
-    def test_search_validation_errors(self, sample_library_data):
+    def test_search_validation_errors(
+        self, mock_cohere_deterministic, sample_library_data
+    ):
         """Test search with various validation errors"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]
@@ -561,7 +561,9 @@ class TestSearchEndpoints:
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_search_response_structure_comprehensive(self, sample_library_data):
+    def test_search_response_structure_comprehensive(
+        self, mock_cohere_deterministic, sample_library_data
+    ):
         """Test comprehensive search response structure validation"""
         lib_response = client.post("/api/v1/libraries", json=sample_library_data)
         library_id = lib_response.json()["id"]

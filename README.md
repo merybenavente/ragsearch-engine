@@ -219,33 +219,46 @@ curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/documents/${D
 
 ### Running Tests
 
-Run the recommended test suite (excludes slow semantic quality tests):
+The project has 150+ tests organized into three categories:
+
+**Quick Test Run (Recommended)**
 ```bash
+# Run fast tests (unit + integration, excludes semantic quality tests)
 poetry run pytest -m "not semantic_quality"
 ```
 
-Run the full test suite (including slow semantic quality tests, and which needs a `COHERE_API_KEY`):
+**Full Test Suite**
 ```bash
+# Run all tests including semantic quality (requires COHERE_API_KEY)
 poetry run pytest
 ```
 
-
-Run specific test categories:
+**Test Categories**
 ```bash
-# Unit tests only
+# Unit tests (fast, isolated components with mocked dependencies)
 poetry run pytest tests/unit/
 
-# Integration tests only
+# Integration tests (medium speed, component interactions with mocked external services)
 poetry run pytest tests/integration/
 
-# Semantic quality tests (requires COHERE_API_KEY)
+# Semantic quality tests (slow, real Cohere API calls for search quality validation)
+export COHERE_API_KEY="your-api-key"
 poetry run pytest -m semantic_quality
-
-# Specific test file
-poetry run pytest tests/unit/test_domain_models.py
 ```
 
-More information in the [Testing Strategy README](tests/README.md).
+**Additional Options**
+```bash
+# Run with coverage report
+poetry run pytest tests/unit/ --cov=src/vector_db --cov-report=html
+
+# Run specific test file
+poetry run pytest tests/unit/test_domain_models.py
+
+# Verbose output for debugging
+poetry run pytest -v tests/integration/test_complete_workflow.py
+```
+
+For detailed testing strategy, architecture, and best practices, see the [Testing Strategy README](tests/README.md).
 
 ### Code Quality
 

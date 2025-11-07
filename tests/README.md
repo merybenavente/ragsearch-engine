@@ -2,83 +2,87 @@
 
 This document outlines the testing strategy, organization, and best practices for the Vector Database project.
 
-## 📁 Test Organization
+## Test Organization
 
 ### Directory Structure
 ```
 tests/
 ├── README.md                           # This file - testing strategy and documentation
+├── __init__.py                         # Makes tests a Python package
 ├── conftest.py                         # Global pytest configuration and fixtures
+├── utils.py                            # Shared test utilities and helpers
 ├── unit/                               # Unit tests for isolated components
+│   ├── __init__.py                     # Package marker
 │   ├── test_domain_models.py           # Domain model tests (Chunk, Document, Library)
 │   ├── test_repositories.py            # Repository layer tests
 │   ├── test_vector_db_service_document.py  # Document service tests
 │   ├── test_vector_db_service_library.py   # Library service tests
 │   ├── test_vector_db_service_search.py    # Search service tests
-│   ├── test_vector_db_service_integration.py # Service integration tests
 │   ├── test_api_functions.py           # Basic API function tests
 │   ├── test_index_factory.py           # Index factory tests
 │   ├── test_index_base.py              # BaseVectorIndex shared functionality tests
-│   ├── test_naive.py                   # NaiveIndex linear search tests
+│   ├── test_index_naive.py             # NaiveIndex linear search tests
 │   ├── test_index_lsh.py               # LSH index algorithm-specific tests
 │   └── test_index_vptree.py            # VPTree index algorithm-specific tests
-└── integration/                        # Integration and end-to-end tests
-    ├── test_api_endpoints.py           # API endpoint integration tests
-    ├── test_complete_workflow.py       # End-to-end workflow tests
-    ├── test_semantic_search_quality.py # Semantic search quality tests
-    └── test_main.py                    # Main application tests
+├── integration/                        # Integration and end-to-end tests
+│   ├── __init__.py                     # Package marker
+│   ├── test_api_endpoints.py           # API endpoint integration tests
+│   ├── test_complete_workflow.py       # End-to-end workflow tests
+│   ├── test_vector_db_service_integration.py # Service integration tests
+│   └── test_main.py                    # Main application tests
+└── semantic/                           # Semantic search quality tests (real Cohere API)
+    └── test_semantic_search_quality.py # Real API semantic validation tests
 ```
 
-### Test Categories
+## Test Categories
 
-#### 🔧 Unit Tests (`tests/unit/`)
-- **Purpose**: Test individual components in isolation
+### Unit Tests (`tests/unit/`)
+**Purpose**: Test individual components in isolation with fast feedback
+
 - **Scope**: Single classes, functions, or modules
-- **Dependencies**: Use mocks and stubs to isolate system under test
+- **Dependencies**: Mocked external services for deterministic results
 - **Speed**: Fast (< 100ms per test)
 - **Coverage**: Aim for 90%+ code coverage
+- **Focus**: Edge cases, error conditions, algorithm correctness
 
-**Vector Index Test Organization:**
-The vector index tests are organized to eliminate redundancy and focus on specific functionality:
+**Key Components:**
+- **Domain Models**: Chunk, Document, Library, Metadata validation
+- **Service Layer**: VectorDBService business logic
+- **Repository Layer**: Data access patterns
+- **Vector Indexes**: Algorithm-specific behavior testing
 
-- **`test_index_base.py`**: Tests shared BaseVectorIndex functionality
-  - Thread safety and concurrency control
-  - Chunk storage and document management
-  - Cosine similarity calculations
-  - Public API contracts
+### Integration Tests (`tests/integration/`)
+**Purpose**: Test component interactions and complete workflows with mocked external services
 
-- **`test_naive.py`**: Tests NaiveIndex-specific behavior
-  - Linear search characteristics
-  - No indexing overhead validation
-  - Baseline accuracy verification
-
-- **`test_index_lsh.py`**: Tests LSH algorithm-specific features
-  - Hash function generation and reproducibility
-  - Hyperplane-based bucketing
-  - Approximate search behavior
-  - Hash table management
-
-- **`test_index_vptree.py`**: Tests VP-Tree algorithm-specific features
-  - Tree structure and node organization
-  - Distance-based partitioning
-  - Triangle inequality pruning
-  - Tree rebuilding behavior
-
-#### 🔗 Integration Tests (`tests/integration/`)
-- **Purpose**: Test component interactions and workflows
 - **Scope**: Multiple components working together
-- **Dependencies**: Real components with mocked external services
+- **Dependencies**: Real internal components + mocked external services (Cohere API)
 - **Speed**: Medium (100ms - 1s per test)
-- **Coverage**: Focus on critical user paths
+- **Coverage**: Critical user journeys and cross-component interactions
+- **Focus**: API endpoints, complete workflows, system integration
 
-#### 📊 Semantic Quality Tests (`tests/integration/test_semantic_search_quality.py`)
-- **Purpose**: Test search quality and relevance
-- **Scope**: Real embedding API integration
-- **Dependencies**: Actual Cohere API (optional, skipped if no API key)
-- **Speed**: Slow (1s+ per test)
-- **Coverage**: Search quality and semantic understanding
+**Key Scenarios:**
+- **API Layer**: REST endpoint validation with proper HTTP responses
+- **Complete Workflows**: End-to-end user journeys (create → ingest → search → update → delete)
+- **Service Integration**: Cross-component interactions with realistic data flows
+- **Error Recovery**: System resilience and error handling
 
-## 🏗️ Test Architecture
+### Semantic Quality Tests (`tests/semantic/`)
+**Purpose**: Test search quality and semantic understanding using real embedding API
+
+- **Scope**: Semantic search accuracy with real embeddings
+- **Dependencies**: **Real Cohere API** (requires COHERE_API_KEY)
+- **Speed**: Slow (1s+ per test due to API calls)
+- **Coverage**: Search quality, semantic relationships, multilingual support
+- **Focus**: Relative ranking validation, context understanding, synonyms
+
+**Quality Validation:**
+- **Semantic Similarity**: Related concepts score higher than unrelated ones
+- **Context Awareness**: Domain-specific understanding (e.g., "Python" as programming language vs. snake)
+- **Multilingual**: Cross-language semantic understanding
+- **Ranking Quality**: Results properly ordered by relevance
+- **Index Performance**: Semantic quality across different index types (LSH, VPTree, Naive)
+
+## Test Architecture
 
 ### Test Fixtures and Mocking Strategy
 
@@ -87,6 +91,12 @@ The vector index tests are organized to eliminate redundancy and focus on specif
 - **`sample_library_data`**: Standard library test data
 - **`sample_document_data`**: Standard document test data
 - **`mock_cohere_deterministic`**: Deterministic embeddings for consistent results
+
+#### Shared Test Utilities (`utils.py`)
+- **`create_deterministic_embedding(text, dimension)`**: Creates reproducible embeddings based on text content
+  - Uses hash-based seeding for consistent results across test runs
+  - Normalizes embeddings to unit length
+  - Supports configurable embedding dimensions
 
 #### Mock Embedding Service
 ```python
@@ -118,7 +128,7 @@ class MockEmbeddingService(EmbeddingService):
 - Provide sensible defaults with ability to override
 - Use descriptive test data that reflects real usage
 
-## 🧪 Testing Best Practices
+## Testing Best Practices
 
 ### Test Naming Convention
 ```python
@@ -171,40 +181,76 @@ def test_create_document_library_not_found(self):
 - Focus on ranking correctness over specific similarity values
 - Test edge cases (empty queries, no results, etc.)
 
-## 🚀 Running Tests
+## Running Tests
 
 ### Basic Test Execution
-```bash
-# Run all tests
-pytest
 
-# Run specific test categories
-pytest tests/unit/                      # Unit tests only
-pytest tests/integration/               # Integration tests only
-pytest -m "not slow"                    # Skip slow tests
+#### Unit Tests (Fast, Mocked)
+```bash
+# Run all unit tests
+poetry run pytest tests/unit/
+
+# Run specific unit test components
+poetry run pytest tests/unit/test_domain_models.py      # Domain models only
+poetry run pytest tests/unit/test_index_*.py            # All index tests
+poetry run pytest tests/unit/test_vector_db_service_*.py  # Service layer only
 
 # Run with coverage
-pytest --cov=src/vector_db --cov-report=html
+poetry run pytest tests/unit/ --cov=src/vector_db --cov-report=html
+```
 
-# Run specific test file
-pytest tests/unit/test_domain_models.py
+#### Integration Tests (Medium, Mocked External Services)
+```bash
+# Run all integration tests (mocked Cohere API)
+poetry run pytest tests/integration/
+
+# Run specific integration scenarios
+poetry run pytest tests/integration/test_api_endpoints.py     # API layer only
+poetry run pytest tests/integration/test_complete_workflow.py # End-to-end workflows
+poetry run pytest tests/integration/test_vector_db_service_integration.py  # Service integration
+
+# Run integration tests with coverage
+poetry run pytest tests/integration/ --cov=src/vector_db
+```
+
+#### Semantic Quality Tests (Slow, Real API)
+```bash
+# Set up Cohere API key first
+export COHERE_API_KEY="your-api-key-here"
+
+# Run all semantic quality tests
+poetry run pytest -m semantic_quality
+# OR run the semantic directory directly
+poetry run pytest tests/semantic/
+
+# Run specific semantic tests
+poetry run pytest tests/semantic/test_semantic_search_quality.py::TestSemanticSearchQuality::test_semantic_similarity_basic
+
+# Run with verbose output (recommended for debugging)
+poetry run pytest -m semantic_quality -v
+
+# Skip if no API key (tests will be skipped automatically)
+poetry run pytest tests/semantic/test_semantic_search_quality.py
+```
+
+#### Combined Test Runs
+```bash
+# Run all tests except semantic quality (default CI behavior)
+poetry run pytest -m "not semantic_quality"
+
+# Run everything including semantic tests (if API key available)
+poetry run pytest
+
+# Run fast tests only (unit + integration without semantic)
+poetry run pytest -m "not slow"
 ```
 
 ### Test Markers
-- `@pytest.mark.integration`: Integration tests
-- `@pytest.mark.semantic_quality`: Semantic search quality tests
-- `@pytest.mark.slow`: Slow-running tests (require API calls)
+- `@pytest.mark.integration`: Integration tests with mocked external services
+- `@pytest.mark.semantic_quality`: Semantic search quality tests (real Cohere API)
+- `@pytest.mark.slow`: Slow-running tests (require API calls or heavy computation)
 
-### Environment Setup
-```bash
-# Optional: Set Cohere API key for semantic quality tests
-export COHERE_API_KEY="your-api-key-here"
-
-# Run without API key (semantic tests will be skipped)
-pytest tests/integration/test_semantic_search_quality.py
-```
-
-## 📈 Test Coverage Goals
+## Test Coverage Goals
 
 ### Coverage Targets
 - **Unit Tests**: 90%+ code coverage
@@ -223,11 +269,11 @@ pytest tests/integration/test_semantic_search_quality.py
 ### Test Debugging
 ```bash
 # Run single test with verbose output
-pytest -xvs tests/unit/test_domain_models.py::TestChunk::test_chunk_creation
+poetry run pytest -xvs tests/unit/test_domain_models.py::TestChunk::test_chunk_creation
 
 # Run with pdb debugger
-pytest --pdb tests/unit/test_domain_models.py::TestChunk::test_chunk_creation
+poetry run pytest --pdb tests/unit/test_domain_models.py::TestChunk::test_chunk_creation
 
 # Show test output
-pytest -s tests/unit/test_domain_models.py
+poetry run pytest -s tests/unit/test_domain_models.py
 ```

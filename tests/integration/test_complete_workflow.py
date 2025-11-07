@@ -1,14 +1,10 @@
 """Comprehensive end-to-end integration test for the complete vector database workflow"""
 
-import hashlib
-import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from fastapi import status
-from unittest.mock import patch, MagicMock
 
 from src.vector_db.api.main import app
-from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 """
 The test successfully demonstrates the entire user journey:
@@ -27,39 +23,11 @@ The test successfully demonstrates the entire user journey:
 client = TestClient(app)
 
 
-# Mock Cohere embedding service for integration tests
-@pytest.fixture(autouse=True)
-def mock_cohere_embedding_service():
-    """Mock the Cohere embedding service for integration tests with realistic embeddings"""
-
-    def create_realistic_embedding(text: str) -> list[float]:
-        """Create deterministic but realistic mock embedding based on text content"""
-        # Create deterministic embedding based on text hash
-        seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-        np.random.seed(seed % (2**32))
-        embedding = np.random.randn(EMBEDDING_DIMENSION)
-        # Normalize to unit vector for realistic similarity calculations
-        embedding = embedding / np.linalg.norm(embedding)
-        return embedding.tolist()
-
-    with patch("src.vector_db.infrastructure.embedding_service.co") as mock_co:
-
-        def mock_embed(texts, **kwargs):
-            # Generate realistic embeddings for each text
-            embeddings = [create_realistic_embedding(text) for text in texts]
-            mock_response = MagicMock()
-            mock_response.embeddings = embeddings
-            return mock_response
-
-        mock_co.embed = mock_embed
-        yield mock_co
-
-
 @pytest.mark.integration
 class TestCompleteVectorDBWorkflow:
     """Complete end-to-end workflow testing for the vector database system"""
 
-    def test_complete_workflow_naive_index(self):
+    def test_complete_workflow_naive_index(self, mock_cohere_deterministic):
         """Test complete workflow with naive index: create library → add documents → search → update → delete"""
 
         # === PHASE 1: Library Creation ===
@@ -393,7 +361,7 @@ class TestCompleteVectorDBWorkflow:
         print("✓ Cleanup and cascade deletion")
         print("✅ Complete vector database workflow successfully tested!")
 
-    def test_workflow_with_empty_and_minimal_content(self):
+    def test_workflow_with_empty_and_minimal_content(self, mock_cohere_deterministic):
         """Test workflow edge cases with empty documents and minimal content"""
 
         # Create library
@@ -440,7 +408,7 @@ class TestCompleteVectorDBWorkflow:
         # Cleanup
         client.delete(f"/api/v1/libraries/{library_id}")
 
-    def test_workflow_error_recovery(self):
+    def test_workflow_error_recovery(self, mock_cohere_deterministic):
         """Test workflow behavior with various error conditions"""
 
         # Create library
