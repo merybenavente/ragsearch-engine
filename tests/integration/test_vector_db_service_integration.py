@@ -1,5 +1,4 @@
 """Integration tests for VectorDBService complete workflows"""
-
 import pytest
 from uuid import uuid4
 
