@@ -115,7 +115,7 @@ class VPTreeIndex(BaseVectorIndex):
             mid = len(distances) // 2
             left_chunks = [chunk for _, chunk in distances[:mid]]
             right_chunks = [chunk for _, chunk in distances[mid:]]
-            threshold = distances[mid - 1][0] if mid > 0 else 0.0
+            threshold = distances[mid - 1][0] if mid > 0 else distances[0][0]
 
         # Create node and recursively build subtrees
         node = VPTreeNode([vantage_point], threshold, is_leaf=False)
