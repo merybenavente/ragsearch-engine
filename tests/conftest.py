@@ -1,13 +1,12 @@
 """Pytest configuration and fixtures"""
 
-import hashlib
-import numpy as np
 import pytest
 import pytest_asyncio
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 from src.vector_db.infrastructure.logging import configure_logging, LogLevel
+from tests.utils import create_deterministic_embedding
 
 
 # ============================================================================
@@ -72,19 +71,15 @@ def mock_cohere_deterministic():
     """Mock Cohere embedding API with deterministic embeddings based on text content"""
     from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
-    def create_deterministic_embedding(text: str) -> list[float]:
-        """Create deterministic mock embedding based on text hash"""
-        seed = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-        np.random.seed(seed % (2**32))
-        embedding = np.random.randn(EMBEDDING_DIMENSION)
-        return (embedding / np.linalg.norm(embedding)).tolist()
-
     with patch("src.vector_db.infrastructure.embedding_service.co") as mock_co:
 
         def mock_embed(texts, **kwargs):
             if isinstance(texts, str):
                 texts = [texts]
-            embeddings = [create_deterministic_embedding(text) for text in texts]
+            embeddings = [
+                create_deterministic_embedding(text, EMBEDDING_DIMENSION)
+                for text in texts
+            ]
             mock_response = MagicMock()
             mock_response.embeddings = embeddings
             return mock_response
@@ -132,15 +127,7 @@ def mock_embedding_service_failure():
 @pytest.fixture
 def deterministic_embeddings():
     """Generate deterministic embeddings for testing index implementations"""
-
-    def create_embedding(text: str, dimension: int = 10) -> list[float]:
-        """Create deterministic embedding based on text content"""
-        seed = hash(text) % (2**32)
-        np.random.seed(seed)
-        embedding = np.random.randn(dimension)
-        return (embedding / np.linalg.norm(embedding)).tolist()
-
-    return create_embedding
+    return create_deterministic_embedding
 
 
 # ============================================================================

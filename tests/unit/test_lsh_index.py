@@ -8,6 +8,7 @@ from uuid import uuid4
 from src.vector_db.infrastructure.index_factory import IndexFactory
 from src.vector_db.infrastructure.indexes.lsh import LSHIndex
 from src.vector_db.domain.models import Chunk
+from tests.utils import create_deterministic_embedding
 
 
 class TestLSHIndex:
@@ -24,16 +25,6 @@ class TestLSHIndex:
         return Chunk(
             id=chunk_id, document_id=str(uuid4()), text=text, embedding=embedding
         )
-
-    def create_deterministic_embedding(
-        self, text: str, dimension: int = 10
-    ) -> List[float]:
-        """Create deterministic embedding based on text content"""
-        # Use text hash as seed for reproducible results
-        seed = hash(text) % (2**32)
-        np.random.seed(seed)
-        embedding = np.random.randn(dimension)
-        return (embedding / np.linalg.norm(embedding)).tolist()
 
 
 class TestLSHInitialization:
@@ -179,9 +170,9 @@ class TestLSHIndexing(TestLSHIndex):
     def test_add_chunks_with_embeddings(self):
         """Test adding chunks with embeddings"""
         embeddings = [
-            self.create_deterministic_embedding("text1", 10),
-            self.create_deterministic_embedding("text2", 10),
-            self.create_deterministic_embedding("text3", 10),
+            create_deterministic_embedding("text1", 10),
+            create_deterministic_embedding("text2", 10),
+            create_deterministic_embedding("text3", 10),
         ]
 
         chunks = [
@@ -208,8 +199,8 @@ class TestLSHIndexing(TestLSHIndex):
     def test_add_chunks_mixed_embeddings(self):
         """Test adding chunks with some having embeddings and some not"""
         embeddings = [
-            self.create_deterministic_embedding("text1", 10),
-            self.create_deterministic_embedding("text3", 10),
+            create_deterministic_embedding("text1", 10),
+            create_deterministic_embedding("text3", 10),
         ]
 
         chunks = [
@@ -235,8 +226,8 @@ class TestLSHIndexing(TestLSHIndex):
     def test_hyperplane_initialization_once(self):
         """Test that hyperplanes are only initialized once"""
         embeddings = [
-            self.create_deterministic_embedding("text1", 10),
-            self.create_deterministic_embedding("text2", 10),
+            create_deterministic_embedding("text1", 10),
+            create_deterministic_embedding("text2", 10),
         ]
 
         chunks1 = [self.create_test_chunk("chunk1", "text1", embeddings[0])]
@@ -272,9 +263,9 @@ class TestLSHRemoval(TestLSHIndex):
         """Test removing chunks that exist in the index"""
         # First add some chunks
         embeddings = [
-            self.create_deterministic_embedding("text1", 10),
-            self.create_deterministic_embedding("text2", 10),
-            self.create_deterministic_embedding("text3", 10),
+            create_deterministic_embedding("text1", 10),
+            create_deterministic_embedding("text2", 10),
+            create_deterministic_embedding("text3", 10),
         ]
 
         chunks = [
@@ -313,7 +304,7 @@ class TestLSHRemoval(TestLSHIndex):
     def test_remove_nonexistent_chunks(self):
         """Test removing chunks that don't exist"""
         # Add some chunks first
-        embeddings = [self.create_deterministic_embedding("text1", 10)]
+        embeddings = [create_deterministic_embedding("text1", 10)]
         chunks = [self.create_test_chunk("chunk1", "text1", embeddings[0])]
 
         self.lsh_index._add_chunks_impl(chunks)
@@ -334,7 +325,7 @@ class TestLSHRemoval(TestLSHIndex):
     def test_remove_empty_bucket_cleanup(self):
         """Test that empty buckets are cleaned up after removal"""
         # Add a single chunk
-        embedding = self.create_deterministic_embedding("text1", 10)
+        embedding = create_deterministic_embedding("text1", 10)
         chunk = self.create_test_chunk("chunk1", "text1", embedding)
 
         self.lsh_index._add_chunks_impl([chunk])
@@ -361,13 +352,13 @@ class TestLSHSearch(TestLSHIndex):
 
     def test_search_empty_index(self):
         """Test searching in empty index"""
-        query_embedding = self.create_deterministic_embedding("query", 10)
+        query_embedding = create_deterministic_embedding("query", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
         assert results == []
 
     def test_search_no_hyperplanes(self):
         """Test searching before hyperplanes are generated"""
-        query_embedding = self.create_deterministic_embedding("query", 10)
+        query_embedding = create_deterministic_embedding("query", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
         assert results == []
 
@@ -380,11 +371,9 @@ class TestLSHSearch(TestLSHIndex):
         """Test basic search functionality"""
         # Use very similar text to create similar embeddings
         embeddings = [
-            self.create_deterministic_embedding("machine learning", 10),
-            self.create_deterministic_embedding(
-                "machine learninG", 10
-            ),  # One char diff
-            self.create_deterministic_embedding("machine learnin", 10),  # One char diff
+            create_deterministic_embedding("machine learning", 10),
+            create_deterministic_embedding("machine learninG", 10),  # One char diff
+            create_deterministic_embedding("machine learnin", 10),  # One char diff
         ]
 
         chunks = [
@@ -399,7 +388,7 @@ class TestLSHSearch(TestLSHIndex):
             self.lsh_index._chunks[chunk.id] = chunk
 
         # Search with query very similar to indexed texts
-        query_embedding = self.create_deterministic_embedding("machine learning", 10)
+        query_embedding = create_deterministic_embedding("machine learning", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
 
         # Should return some results
@@ -412,7 +401,7 @@ class TestLSHSearch(TestLSHIndex):
         """Test that search respects k limit"""
         # Add many chunks with very similar text
         embeddings = [
-            self.create_deterministic_embedding(f"testing{i}", 10) for i in range(10)
+            create_deterministic_embedding(f"testing{i}", 10) for i in range(10)
         ]
 
         chunks = [
@@ -425,7 +414,7 @@ class TestLSHSearch(TestLSHIndex):
             self.lsh_index._chunks[chunk.id] = chunk
 
         # Search with k=3 using similar text
-        query_embedding = self.create_deterministic_embedding("testing1", 10)
+        query_embedding = create_deterministic_embedding("testing1", 10)
         results = self.lsh_index._search_impl(query_embedding, k=3, min_similarity=0.0)
 
         # Should return at most k results
@@ -435,8 +424,8 @@ class TestLSHSearch(TestLSHIndex):
         """Test that search respects min_similarity threshold"""
         # Add chunks with very similar text
         embeddings = [
-            self.create_deterministic_embedding("similar text", 10),
-            self.create_deterministic_embedding("similar texT", 10),  # One char diff
+            create_deterministic_embedding("similar text", 10),
+            create_deterministic_embedding("similar texT", 10),  # One char diff
         ]
 
         chunks = [
@@ -449,7 +438,7 @@ class TestLSHSearch(TestLSHIndex):
             self.lsh_index._chunks[chunk.id] = chunk
 
         # Search with high similarity threshold
-        query_embedding = self.create_deterministic_embedding("similar text", 10)
+        query_embedding = create_deterministic_embedding("similar text", 10)
         results_high_threshold = self.lsh_index._search_impl(
             query_embedding, k=5, min_similarity=0.8
         )
@@ -466,9 +455,9 @@ class TestLSHSearch(TestLSHIndex):
         """Test that search results are sorted by similarity in descending order"""
         # Add chunks with very similar text
         embeddings = [
-            self.create_deterministic_embedding("sorttest", 10),
-            self.create_deterministic_embedding("sorttesT", 10),  # One char diff
-            self.create_deterministic_embedding("sortTesT", 10),  # Two char diff
+            create_deterministic_embedding("sorttest", 10),
+            create_deterministic_embedding("sorttesT", 10),  # One char diff
+            create_deterministic_embedding("sortTesT", 10),  # Two char diff
         ]
 
         chunks = [
@@ -481,7 +470,7 @@ class TestLSHSearch(TestLSHIndex):
         for chunk in chunks:
             self.lsh_index._chunks[chunk.id] = chunk
 
-        query_embedding = self.create_deterministic_embedding("sorttest", 10)
+        query_embedding = create_deterministic_embedding("sorttest", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
 
         if len(results) > 1:
@@ -547,7 +536,7 @@ class TestLSHThreadSafety(TestLSHIndex):
 
         def add_chunks_worker(worker_id: int):
             embeddings = [
-                self.create_deterministic_embedding(f"worker{worker_id}_text{i}", 10)
+                create_deterministic_embedding(f"worker{worker_id}_text{i}", 10)
                 for i in range(5)
             ]
 
@@ -591,7 +580,7 @@ class TestLSHThreadSafety(TestLSHIndex):
         search_results = []
 
         def search_worker():
-            query_embedding = self.create_deterministic_embedding("search query", 10)
+            query_embedding = create_deterministic_embedding("search query", 10)
             for _ in range(10):
                 results = self.lsh_index._search_impl(
                     query_embedding, k=5, min_similarity=0.0
@@ -601,9 +590,7 @@ class TestLSHThreadSafety(TestLSHIndex):
 
         def index_worker():
             for i in range(5):
-                embedding = self.create_deterministic_embedding(
-                    f"concurrent_text{i}", 10
-                )
+                embedding = create_deterministic_embedding(f"concurrent_text{i}", 10)
                 chunk = self.create_test_chunk(
                     f"concurrent_chunk{i}", f"text{i}", embedding
                 )
@@ -647,14 +634,14 @@ class TestLSHEdgeCases(TestLSHIndex):
         """Test with large embedding dimensions"""
         index = LSHIndex(num_tables=3, num_hyperplanes=4)
 
-        embedding = self.create_deterministic_embedding("large_text", 1000)
+        embedding = create_deterministic_embedding("large_text", 1000)
         chunk = self.create_test_chunk("chunk1", "text1", embedding)
 
         index._add_chunks_impl([chunk])
         index._chunks[chunk.id] = chunk
 
         # Should work without errors
-        query_embedding = self.create_deterministic_embedding("large_query", 1000)
+        query_embedding = create_deterministic_embedding("large_query", 1000)
         results = index._search_impl(query_embedding, k=1, min_similarity=0.0)
         assert len(results) <= 1
 
@@ -673,7 +660,7 @@ class TestLSHEdgeCases(TestLSHIndex):
     def test_chunk_without_embedding_in_search(self):
         """Test search behavior when indexed chunk loses its embedding"""
         # Add chunk with embedding
-        embedding = self.create_deterministic_embedding("text1", 10)
+        embedding = create_deterministic_embedding("text1", 10)
         chunk = self.create_test_chunk("chunk1", "text1", embedding)
 
         self.lsh_index._add_chunks_impl([chunk])
@@ -683,7 +670,7 @@ class TestLSHEdgeCases(TestLSHIndex):
         self.lsh_index._chunks[chunk.id] = chunk_no_embedding
 
         # Search should handle this gracefully
-        query_embedding = self.create_deterministic_embedding("query", 10)
+        query_embedding = create_deterministic_embedding("query", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
 
         # Should not crash and should not return the chunk without embedding
