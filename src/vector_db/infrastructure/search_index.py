@@ -25,7 +25,6 @@ class RepositoryAwareSearchIndex(SearchIndex):
     def __init__(self, index_factory: IndexFactory):
         self.index_factory = index_factory
         self._library_indexes: Dict[LibraryID, VectorIndex] = {}
-        self._library_index_types: Dict[LibraryID, str] = {}
         self._document_library_mapping: Dict[DocumentID, LibraryID] = {}
         self._lock = RLock()  # Thread safety for concurrent index operations
 
@@ -33,12 +32,9 @@ class RepositoryAwareSearchIndex(SearchIndex):
         """Get or create the index for a library"""
         with self._lock:
             if library_id not in self._library_indexes:
-                index_type = self._library_index_types.get(library_id, "naive")
                 self._library_indexes[library_id] = self.index_factory.create_index(
-                    index_type
+                    "naive"
                 )
-                if library_id not in self._library_index_types:
-                    self._library_index_types[library_id] = index_type
             return self._library_indexes[library_id]
 
     def create_library_index(
@@ -53,7 +49,6 @@ class RepositoryAwareSearchIndex(SearchIndex):
             self._library_indexes[library_id] = self.index_factory.create_index(
                 index_type, **params
             )
-            self._library_index_types[library_id] = index_type
             logger.info(
                 "Library index created",
                 lib_id=library_id,
@@ -107,6 +102,7 @@ class RepositoryAwareSearchIndex(SearchIndex):
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks within the specified library"""
         with self._lock:
+            # TODO: review
             index = self.get_library_index(library_id)
             results = index.search(query_embedding, k, min_similarity)
 
