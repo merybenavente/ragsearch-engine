@@ -71,7 +71,7 @@ def mock_cohere_deterministic():
     """Mock Cohere embedding API with deterministic embeddings based on text content"""
     from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
-    with patch("src.vector_db.infrastructure.embedding_service.co") as mock_co:
+    with patch("src.vector_db.infrastructure.cohere_embedding_service.co") as mock_co:
 
         def mock_embed(texts, **kwargs):
             if isinstance(texts, str):
@@ -166,7 +166,9 @@ def vector_db_service_instance():
     from src.vector_db.infrastructure.repositories import RepositoryManager
     from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
     from src.vector_db.infrastructure.index_factory import IndexFactory
-    from src.vector_db.infrastructure.embedding_service import CohereEmbeddingService
+    from src.vector_db.infrastructure.cohere_embedding_service import (
+        CohereEmbeddingService,
+    )
 
     repo_manager = RepositoryManager()
     search_index = RepositoryAwareSearchIndex(IndexFactory())

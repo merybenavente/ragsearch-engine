@@ -7,7 +7,7 @@ from src.vector_db.domain.models import Chunk
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
 from src.vector_db.infrastructure.index_factory import IndexFactory
-from src.vector_db.infrastructure.embedding_service import CohereEmbeddingService
+from src.vector_db.infrastructure.cohere_embedding_service import CohereEmbeddingService
 
 
 class TestVectorDBServiceIntegration:

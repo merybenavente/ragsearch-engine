@@ -1,6 +1,6 @@
 # New DDD Architecture Dependencies
 from ..infrastructure.repositories import RepositoryManager
-from ..infrastructure.embedding_service import CohereEmbeddingService
+from ..infrastructure.cohere_embedding_service import CohereEmbeddingService
 from ..infrastructure.search_index import RepositoryAwareSearchIndex
 from ..infrastructure.index_factory import IndexFactory
 from ..application.vector_db_service import VectorDBService

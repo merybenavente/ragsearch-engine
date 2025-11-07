@@ -50,7 +50,9 @@ class TestVectorDBServiceSearch:
                 library_id=fake_library_id, query_text="test query"
             )
 
-    def test_search_library_when_empty(self, vector_db_service_instance):
+    def test_search_library_when_empty(
+        self, mock_cohere_deterministic, vector_db_service_instance
+    ):
         """Test searching empty library returns empty results"""
         library = vector_db_service_instance.create_library("Empty Library")
 
