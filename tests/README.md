@@ -80,7 +80,10 @@ tests/
 - **Context Awareness**: Domain-specific understanding (e.g., "Python" as programming language vs. snake)
 - **Multilingual**: Cross-language semantic understanding
 - **Ranking Quality**: Results properly ordered by relevance
-- **Index Performance**: Semantic quality across different index types (LSH, VPTree, Naive)
+- **Index Performance**: Semantic quality across different index types and parameters
+  - **LSH Index**: Tests with various `num_tables` and `num_hyperplanes` configurations
+  - **VP-Tree Index**: Tests with different `leaf_size` parameters (10, 20 default, 50)
+  - **Naive Index**: Baseline linear search for comparison
 
 ## Test Architecture
 
@@ -180,6 +183,10 @@ def test_create_document_library_not_found(self):
 - Test relative similarity relationships rather than absolute scores
 - Focus on ranking correctness over specific similarity values
 - Test edge cases (empty queries, no results, etc.)
+
+### Index Parameter Testing
+- **VP-Tree**: Tests different `leaf_size` values (10, 20 default, 50) to validate search quality across tree structures
+- **LSH**: Tests optimized parameters (`num_tables=8, num_hyperplanes=2`) for high-dimensional embeddings
 
 ## Running Tests
 

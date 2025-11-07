@@ -24,7 +24,7 @@ class TestSemanticSearchQuality:
         [
             ("naive", None),
             ("vptree", None),
-            ("lsh", {"num_tables": 4, "num_hyperplanes": 2}),
+            ("lsh", {"num_tables": 8, "num_hyperplanes": 2}),
         ],
     )
     def test_semantic_similarity_basic(self, index_type, index_params):
@@ -71,6 +71,145 @@ class TestSemanticSearchQuality:
         assert (
             scores["service animal"] > scores["cooking recipes"]
         ), "Related concept should score higher than unrelated content"
+
+    @pytest.mark.parametrize(
+        "index_type,index_params",
+        [
+            ("vptree", None),
+            ("vptree", {"leaf_size": 10}),
+            ("vptree", {"leaf_size": 50}),
+            ("lsh", {"num_tables": 8, "num_hyperplanes": 2}),
+        ],
+    )
+    def test_index_returns_relevant_chunks(self, index_type, index_params):
+        """Test that index implementations return relevant chunks, not random ones"""
+        # Create library with specific index
+        library = self.vector_db_service.create_library(
+            name="Test Library", index_type=index_type, index_params=index_params
+        )
+
+        concrete_doc_text = "Roman concrete was made from volcanic ash called pozzolan mixed with lime. "
+        "This hydraulic cement could set underwater and became stronger over time. "
+        "The Pantheon's dome showcases Roman concrete engineering with varying aggregate sizes. "
+        "Construction techniques included careful mixture ratios and curing processes. "
+        "Marine concrete for harbors used specific volcanic materials for seawater resistance."
+        # Create documents with very distinct, specific content
+        concrete_doc = self.vector_db_service.create_document(
+            library_id=library.id, text=concrete_doc_text
+        )
+
+        aqueduct_doc_text = "Roman aqueducts transported fresh water across vast distances using gravity flow. "
+        "The Aqua Claudia stretched 69 kilometers and delivered 200,000 cubic meters daily. "
+        "Engineers maintained precise gradients of 0.34 meters per kilometer. "
+        "Stone arches like Pont du Gard crossed valleys while preserving water flow. "
+        "Distribution chambers and valve systems controlled water delivery to cities."
+        aqueduct_doc = self.vector_db_service.create_document(
+            library_id=library.id, text=aqueduct_doc_text
+        )
+
+        roads_doc_text = (
+            "Roman roads followed standardized four-layer construction principles. "
+        )
+        "The Via Appia featured precisely cut polygonal stones fitted without mortar. "
+        "Road surfaces were cambered for drainage with ditches running alongside. "
+        "Engineering surveys maintained consistent grades over long distances. "
+        "The network enabled rapid military movement and efficient trade logistics."
+        roads_doc = self.vector_db_service.create_document(
+            library_id=library.id, text=roads_doc_text
+        )
+
+        # Create baseline results using naive index for comparison
+        naive_library = self.vector_db_service.create_library(
+            name="Naive Baseline", index_type="naive"
+        )
+
+        # Add same documents to naive library
+        naive_concrete = self.vector_db_service.create_document(
+            library_id=naive_library.id, text=concrete_doc_text
+        )
+        naive_aqueduct = self.vector_db_service.create_document(
+            library_id=naive_library.id, text=aqueduct_doc_text
+        )
+        naive_roads = self.vector_db_service.create_document(
+            library_id=naive_library.id, text=roads_doc_text
+        )
+
+        # Test queries that should return highly relevant, specific chunks
+        test_cases = [
+            {
+                "query": "concrete construction techniques pozzolan",
+                "expected_doc": concrete_doc.id,
+                "naive_doc": naive_concrete.id,
+                "description": "concrete construction query",
+            },
+            {
+                "query": "aqueduct water systems gradient flow",
+                "expected_doc": aqueduct_doc.id,
+                "naive_doc": naive_aqueduct.id,
+                "description": "aqueduct engineering query",
+            },
+            {
+                "query": "road construction Via Appia stones",
+                "expected_doc": roads_doc.id,
+                "naive_doc": naive_roads.id,
+                "description": "road construction query",
+            },
+        ]
+
+        for case in test_cases:
+            # Get results from test index
+            test_results = self.vector_db_service.search_library(
+                library_id=library.id, query_text=case["query"], k=3, min_similarity=0.0
+            )
+
+            # Get baseline results from naive index
+            baseline_results = self.vector_db_service.search_library(
+                library_id=naive_library.id,
+                query_text=case["query"],
+                k=3,
+                min_similarity=0.0,
+            )
+
+            # Both should return results
+            assert (
+                len(test_results) > 0
+            ), f"No results for {case['description']} in {index_type}"
+            assert (
+                len(baseline_results) > 0
+            ), f"No baseline results for {case['description']}"
+
+            # Get top similarity scores
+            test_top_score = test_results[0][1]
+            baseline_top_score = baseline_results[0][1]
+
+            # Test index should return relevant documents with reasonable similarity scores
+            assert test_top_score > 0.2, (
+                f"{index_type} returned very low similarity ({test_top_score:.3f}) "
+                f"for {case['description']}, suggesting irrelevant results"
+            )
+
+            # Test index top score should be reasonably close to naive baseline
+            score_ratio = (
+                test_top_score / baseline_top_score if baseline_top_score > 0 else 0
+            )
+            assert score_ratio > 0.7, (
+                f"{index_type} top score ({test_top_score:.3f}) much lower than "
+                f"naive baseline ({baseline_top_score:.3f}) for {case['description']}. "
+                f"Ratio: {score_ratio:.3f}. This suggests the index is returning irrelevant chunks."
+            )
+
+            # Verify the top result comes from the expected document type
+            test_top_chunk = test_results[0][0]
+            baseline_top_chunk = baseline_results[0][0]
+
+            assert test_top_chunk.document_id == case["expected_doc"], (
+                f"{index_type} returned chunk from wrong document for {case['description']}. "
+                f"Expected document {case['expected_doc']}, got {test_top_chunk.document_id}"
+            )
+
+            assert (
+                baseline_top_chunk.document_id == case["naive_doc"]
+            ), f"Naive baseline returned chunk from wrong document for {case['description']}"
 
     @pytest.mark.timeout(60)  # Add timeout to prevent hanging
     def test_semantic_similarity_synonyms(self):
