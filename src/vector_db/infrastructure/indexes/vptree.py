@@ -19,7 +19,11 @@ Time Complexity:
 
 Parameters:
 - leaf_size: Minimum number of points in leaf nodes (default: 20)
-- random_seed: Seed for deterministic vantage point selection
+
+Implementation Notes:
+- Uses min-heap for efficient k-NN result collection
+- Triangle inequality pruning provides O(log n) expected search time
+- Performance benefits most apparent with datasets > 1K chunks
 """
 import heapq
 import numpy as np
@@ -172,11 +176,11 @@ class VPTreeIndex(BaseVectorIndex):
                         query_embedding, chunk.embedding
                     )
                     if similarity >= min_similarity:
-                        # Use max-heap for efficient k-NN (negate similarity for max-heap)
+                        # Use min-heap for efficient k-NN
                         if len(results) < k:
-                            heapq.heappush(results, (-similarity, chunk))
-                        elif -similarity > results[0][0]:  # Better than worst in heap
-                            heapq.heapreplace(results, (-similarity, chunk))
+                            heapq.heappush(results, (similarity, chunk))
+                        elif similarity > results[0][0]:  # Better than worst in heap
+                            heapq.heapreplace(results, (similarity, chunk))
             return
 
         # Handle internal nodes
@@ -186,11 +190,11 @@ class VPTreeIndex(BaseVectorIndex):
         # Calculate similarity to vantage point
         similarity = self._cosine_similarity(query_embedding, node.chunk.embedding)
         if similarity >= min_similarity:
-            # Use max-heap for efficient k-NN (negate similarity for max-heap)
+            # Use min-heap to keep track of top-k
             if len(results) < k:
-                heapq.heappush(results, (-similarity, node.chunk))
-            elif -similarity > results[0][0]:  # Better than worst in heap
-                heapq.heapreplace(results, (-similarity, node.chunk))
+                heapq.heappush(results, (similarity, node.chunk))
+            elif similarity > results[0][0]:  # Better than worst in heap
+                heapq.heapreplace(results, (similarity, node.chunk))
 
         # Calculate distance to vantage point
         query_distance = self._distance(query_embedding, node.chunk.embedding)
@@ -198,16 +202,16 @@ class VPTreeIndex(BaseVectorIndex):
         # Determine search radius for pruning
         search_radius = 1.0 - min_similarity  # Convert similarity to distance
         if len(results) == k:
-            # Use current k-th best distance as radius
-            worst_similarity = -results[0][0]
+            # Use current k-th best (worst in heap) to shrink search radius
+            worst_similarity = results[0][0]  # Min-heap root has worst similarity
             search_radius = min(search_radius, 1.0 - worst_similarity)
 
-        # Search left subtree (closer to vantage point)
-        if query_distance <= node.threshold + search_radius:
+        # Search left subtree (points closer to vantage point, distance < threshold)
+        if query_distance - search_radius < node.threshold:
             self._search_tree(node.left, query_embedding, k, min_similarity, results)
 
-        # Search right subtree (farther from vantage point)
-        if query_distance >= node.threshold - search_radius:
+        # Search right subtree (points farther from vantage point, distance >= threshold)
+        if query_distance + search_radius >= node.threshold:
             self._search_tree(node.right, query_embedding, k, min_similarity, results)
 
     def _search_impl(
@@ -221,7 +225,7 @@ class VPTreeIndex(BaseVectorIndex):
         results_heap: List[Tuple[float, Chunk]] = []
         self._search_tree(self.root, query_embedding, k, min_similarity, results_heap)
 
-        # Convert heap back to list and sort by similarity (descending)
-        results = [(chunk, -neg_similarity) for neg_similarity, chunk in results_heap]
+        # Convert min-heap to list and sort by similarity (descending)
+        results = [(chunk, similarity) for similarity, chunk in results_heap]
         results.sort(key=lambda x: x[1], reverse=True)
         return results
