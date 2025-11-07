@@ -23,26 +23,24 @@ Parameters:
 """
 import heapq
 import numpy as np
-from typing import List, Tuple, Optional, TYPE_CHECKING
+from typing import List, Tuple, Optional
 
 from .base import BaseVectorIndex
-
-if TYPE_CHECKING:
-    from ...domain.models import Chunk
+from ...domain.models import Chunk, ChunkID
 
 
 class VPTreeNode:
     """Node in a VP-Tree"""
 
     def __init__(
-        self, chunks: List["Chunk"], threshold: float = 0.0, is_leaf: bool = False
+        self, chunks: List[Chunk], threshold: float = 0.0, is_leaf: bool = False
     ):
         self.threshold = threshold
         self.is_leaf = is_leaf
         self.left: Optional["VPTreeNode"] = None
         self.right: Optional["VPTreeNode"] = None
-        self.chunks: Optional[List["Chunk"]]
-        self.chunk: Optional["Chunk"]
+        self.chunks: Optional[List[Chunk]]
+        self.chunk: Optional[Chunk]
 
         if is_leaf:
             self.chunks = chunks
@@ -66,7 +64,7 @@ class VPTreeIndex(BaseVectorIndex):
         similarity = self._cosine_similarity(embedding1, embedding2)
         return 1.0 - similarity
 
-    def _build_tree(self, chunks: List["Chunk"]) -> Optional[VPTreeNode]:
+    def _build_tree(self, chunks: List[Chunk]) -> Optional[VPTreeNode]:
         """Recursively build VP-Tree from chunks"""
         if not chunks:
             return None
@@ -122,7 +120,7 @@ class VPTreeIndex(BaseVectorIndex):
 
         return node
 
-    def _add_chunks_impl(self, chunks: List["Chunk"]) -> None:
+    def _add_chunks_impl(self, chunks: List[Chunk]) -> None:
         """Build VP-Tree from chunks"""
         if not chunks:
             return
@@ -139,7 +137,7 @@ class VPTreeIndex(BaseVectorIndex):
         # Rebuild tree with all chunks
         self.root = self._build_tree(chunks_with_embeddings.copy())
 
-    def _remove_chunks_impl(self, chunk_ids: List[str]) -> None:
+    def _remove_chunks_impl(self, chunk_ids: List[ChunkID]) -> None:
         """Remove chunks from VP-Tree by rebuilding"""
         if not chunk_ids:
             return
@@ -160,7 +158,7 @@ class VPTreeIndex(BaseVectorIndex):
         query_embedding: List[float],
         k: int,
         min_similarity: float,
-        results: List[Tuple[float, "Chunk"]],
+        results: List[Tuple[float, Chunk]],
     ) -> None:
         """Recursively search VP-Tree with proper pruning"""
         if not node:
@@ -214,13 +212,13 @@ class VPTreeIndex(BaseVectorIndex):
 
     def _search_impl(
         self, query_embedding: List[float], k: int, min_similarity: float
-    ) -> List[Tuple["Chunk", float]]:
+    ) -> List[Tuple[Chunk, float]]:
         """Search using VP-Tree algorithm with proper k-NN"""
         if not self.root or not query_embedding:
             return []
 
         # Use heap for efficient k-NN search
-        results_heap: List[Tuple[float, "Chunk"]] = []
+        results_heap: List[Tuple[float, Chunk]] = []
         self._search_tree(self.root, query_embedding, k, min_similarity, results_heap)
 
         # Convert heap back to list and sort by similarity (descending)

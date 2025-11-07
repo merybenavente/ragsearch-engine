@@ -21,13 +21,11 @@ Parameters:
 - num_hyperplanes: More hyperplanes = more precise bucketing but potentially fewer matches
 """
 import numpy as np
-from typing import List, Tuple, Set, DefaultDict, TYPE_CHECKING
+from typing import List, Tuple, Set, DefaultDict
 from collections import defaultdict
 
 from .base import BaseVectorIndex
-
-if TYPE_CHECKING:
-    from ...domain.models import Chunk
+from ...domain.models import Chunk, ChunkID
 
 
 class LSHIndex(BaseVectorIndex):
@@ -46,7 +44,7 @@ class LSHIndex(BaseVectorIndex):
         self.num_hyperplanes = num_hyperplanes
 
         # Hash tables: each table contains buckets (hash_code -> set of chunk_ids)
-        self.hash_tables: List[DefaultDict[str, Set[str]]] = [
+        self.hash_tables: List[DefaultDict[str, Set[ChunkID]]] = [
             defaultdict(set) for _ in range(num_tables)
         ]
 
@@ -88,7 +86,7 @@ class LSHIndex(BaseVectorIndex):
         # Convert binary array to string for use as dictionary key
         return "".join(hash_bits.astype(str))
 
-    def _add_chunks_impl(self, chunks: List["Chunk"]) -> None:
+    def _add_chunks_impl(self, chunks: List[Chunk]) -> None:
         """Index chunks using LSH algorithm"""
         if not chunks:
             return
@@ -116,7 +114,7 @@ class LSHIndex(BaseVectorIndex):
                 hash_code = self._compute_hash_code(chunk.embedding, table_idx)
                 self.hash_tables[table_idx][hash_code].add(chunk.id)
 
-    def _remove_chunks_impl(self, chunk_ids: List[str]) -> None:
+    def _remove_chunks_impl(self, chunk_ids: List[ChunkID]) -> None:
         """Remove chunks from LSH index"""
         if not chunk_ids:
             return
@@ -137,7 +135,7 @@ class LSHIndex(BaseVectorIndex):
 
     def _search_impl(
         self, query_embedding: List[float], k: int, min_similarity: float
-    ) -> List[Tuple["Chunk", float]]:
+    ) -> List[Tuple[Chunk, float]]:
         """Search using LSH algorithm"""
         if not self.hyperplanes or not query_embedding:
             return []

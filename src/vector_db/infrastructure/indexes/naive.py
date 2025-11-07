@@ -23,25 +23,23 @@ Use this implementation for:
 - Baseline comparisons and correctness verification
 - When exact results are required and performance is not critical
 """
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple
 
 from .base import BaseVectorIndex
-
-if TYPE_CHECKING:
-    from ...domain.models import Chunk
+from ...domain.models import Chunk, ChunkID
 
 
 class NaiveIndex(BaseVectorIndex):
     """Naive implementation using linear search with cosine similarity"""
 
-    def _add_chunks_impl(self, chunks: List["Chunk"]) -> None:
+    def _add_chunks_impl(self, chunks: List[Chunk]) -> None:
         """
         Naive index doesn't need special data structures for indexing.
         Chunks are stored in base class and accessed directly during search.
         """
         pass
 
-    def _remove_chunks_impl(self, chunk_ids: List[str]) -> None:
+    def _remove_chunks_impl(self, chunk_ids: List[ChunkID]) -> None:
         """
         Naive index doesn't need special cleanup for chunk removal.
         Chunks are removed from base class storage and no longer accessible.
@@ -50,7 +48,7 @@ class NaiveIndex(BaseVectorIndex):
 
     def _search_impl(
         self, query_embedding: List[float], k: int, min_similarity: float
-    ) -> List[Tuple["Chunk", float]]:
+    ) -> List[Tuple[Chunk, float]]:
         """Search using linear search with cosine similarity"""
         similarities = []
 
