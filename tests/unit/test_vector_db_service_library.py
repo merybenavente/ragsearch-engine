@@ -22,7 +22,7 @@ class TestVectorDBServiceLibrary:
         assert retrieved_library is not None
         assert retrieved_library.id == library.id
 
-    def test_create_library_with_defaults(self, vector_db_service_instance):
+    def test_create_library_when_using_defaults(self, vector_db_service_instance):
         """Test creating a library with default values"""
         name = "Simple Library"
 
@@ -108,7 +108,7 @@ class TestVectorDBServiceLibrary:
         assert doc1.id in doc_ids
         assert doc2.id in doc_ids
 
-    def test_library_operations_with_invalid_data(self, vector_db_service_instance):
+    def test_library_operations_when_invalid_data(self, vector_db_service_instance):
         """Test library operations with invalid data"""
         # Test create library with empty name
         with pytest.raises(ValueError):

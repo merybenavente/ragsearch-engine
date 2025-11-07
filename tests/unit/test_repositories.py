@@ -103,7 +103,7 @@ class TestDDDRepositories:
         # Verify associated documents are also cleaned up
         assert document_repository.get(document.id) is None
 
-    def test_empty_results(
+    def test_repository_operations_when_empty_results(
         self, vector_db_service, library_repository, document_repository
     ):
         """Test repository behavior with empty results"""

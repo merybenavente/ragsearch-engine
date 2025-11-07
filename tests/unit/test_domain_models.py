@@ -94,7 +94,7 @@ class TestChunk:
 class TestDocument:
     """Test cases for Document model"""
 
-    def test_document_creation_empty(self):
+    def test_create_document_when_empty(self):
         """Test creation of empty document"""
         library_id = str(uuid4())
 

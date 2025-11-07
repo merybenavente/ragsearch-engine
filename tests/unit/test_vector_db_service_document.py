@@ -44,7 +44,7 @@ class TestVectorDBServiceDocument:
             assert len(chunk.embedding) == EMBEDDING_DIMENSION
             assert chunk.document_id == document.id
 
-    def test_create_document_library_not_found(self, vector_db_service_instance):
+    def test_create_document_when_library_not_found(self, vector_db_service_instance):
         """Test creating document in non-existent library raises error"""
         fake_library_id = str(uuid4())
 
@@ -53,7 +53,7 @@ class TestVectorDBServiceDocument:
                 library_id=fake_library_id, text="Test text"
             )
 
-    def test_create_empty_document(self, vector_db_service_instance):
+    def test_create_document_when_empty(self, vector_db_service_instance):
         """Test creating an empty document"""
         library = vector_db_service_instance.create_library(name="Test Library")
         document = vector_db_service_instance.create_empty_document(
@@ -102,7 +102,7 @@ class TestVectorDBServiceDocument:
         full_text = updated_document.get_full_text()
         assert "Updated content" in full_text
 
-    def test_document_operations_with_invalid_ids(self, vector_db_service_instance):
+    def test_document_operations_when_invalid_ids(self, vector_db_service_instance):
         """Test document operations with invalid IDs"""
         fake_id = str(uuid4())
 
@@ -116,7 +116,7 @@ class TestVectorDBServiceDocument:
                 document_id=fake_id, new_text="Updated content"
             )
 
-    def test_embedding_service_failure_handling(
+    def test_create_document_when_embedding_service_fails(
         self, mock_embedding_service_failure, vector_db_service_instance
     ):
         """Test handling of embedding service failures"""
