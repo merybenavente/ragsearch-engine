@@ -6,6 +6,7 @@ import os
 from src.vector_db.api.dependencies import get_vector_db_service
 
 
+# TODO: checkear que dejo fuera cuando quito semantic (is it integration or semantic)
 @pytest.mark.integration
 @pytest.mark.semantic_quality
 @pytest.mark.slow
