@@ -29,11 +29,11 @@ class RepositoryAwareSearchIndex(SearchIndex):
         self._lock = RLock()  # Thread safety for concurrent index operations
 
     def get_library_index(self, library_id: LibraryID) -> VectorIndex:
-        """Get or create the index for a library"""
+        """Get the index for a library"""
         with self._lock:
             if library_id not in self._library_indexes:
-                self._library_indexes[library_id] = self.index_factory.create_index(
-                    "naive"
+                raise ValueError(
+                    f"No index found for library {library_id}. Create one first using create_library_index()."
                 )
             return self._library_indexes[library_id]
 
