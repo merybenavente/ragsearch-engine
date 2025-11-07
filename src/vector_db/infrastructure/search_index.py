@@ -102,7 +102,6 @@ class RepositoryAwareSearchIndex(SearchIndex):
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks within the specified library"""
         with self._lock:
-            # TODO: review
             index = self.get_library_index(library_id)
             results = index.search(query_embedding, k, min_similarity)
 

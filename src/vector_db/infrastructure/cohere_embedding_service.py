@@ -10,7 +10,6 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 
-# TODO: rename this file to cohere_embedding_service and move the cohere client here
 class CohereEmbeddingService(EmbeddingService):
     """Cohere implementation of the EmbeddingService interface"""
 
