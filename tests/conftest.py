@@ -4,9 +4,15 @@ import hashlib
 import numpy as np
 import pytest
 import pytest_asyncio
+from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 from src.vector_db.infrastructure.logging import configure_logging, LogLevel
+
+
+# ============================================================================
+# PYTEST CONFIGURATION
+# ============================================================================
 
 
 def pytest_configure(config):
@@ -29,6 +35,11 @@ def reset_repositories():
     yield
 
 
+# ============================================================================
+# SAMPLE DATA FIXTURES
+# ============================================================================
+
+
 @pytest.fixture
 def sample_library_data():
     """Sample library data for testing"""
@@ -49,6 +60,11 @@ def sample_document_data():
         "tags": ["doc_tag"],
         "chunk_size": 50,
     }
+
+
+# ============================================================================
+# PRIMARY MOCKS
+# ============================================================================
 
 
 @pytest.fixture
@@ -75,3 +91,82 @@ def mock_cohere_deterministic():
 
         mock_co.embed = mock_embed
         yield mock_co
+
+
+# ============================================================================
+# DOMAIN LAYER MOCKS
+# ============================================================================
+
+
+@pytest.fixture
+def mock_datetime():
+    """Mock datetime.now() for deterministic timestamp testing"""
+    fixed_time = datetime(2025, 12, 31, 23, 59, 59)  # Far future time
+
+    with patch("src.vector_db.domain.models.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_time
+        # Keep the real datetime class for other uses
+        mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+        yield mock_dt
+
+
+# ============================================================================
+# SPECIALIZED MOCKS
+# ============================================================================
+
+
+@pytest.fixture
+def mock_embedding_service_failure():
+    """Mock embedding service that always fails - for error testing"""
+    from src.vector_db.domain.interfaces import EmbeddingService
+
+    class FailingEmbeddingService(EmbeddingService):
+        def create_embedding(
+            self, text: str, input_type: str = "search_document"
+        ) -> list[float]:
+            raise RuntimeError("Embedding service failed")
+
+    return FailingEmbeddingService()
+
+
+@pytest.fixture
+def deterministic_embeddings():
+    """Generate deterministic embeddings for testing index implementations"""
+
+    def create_embedding(text: str, dimension: int = 10) -> list[float]:
+        """Create deterministic embedding based on text content"""
+        seed = hash(text) % (2**32)
+        np.random.seed(seed)
+        embedding = np.random.randn(dimension)
+        return (embedding / np.linalg.norm(embedding)).tolist()
+
+    return create_embedding
+
+
+# ============================================================================
+# SERVICE LAYER FIXTURES
+# ============================================================================
+
+
+@pytest.fixture
+def vector_db_service():
+    """Provide a clean VectorDBService instance for each test"""
+    from src.vector_db.api.dependencies import get_vector_db_service
+
+    return get_vector_db_service()
+
+
+@pytest.fixture
+def document_repository():
+    """Provide a clean document repository for each test"""
+    from src.vector_db.api.dependencies import get_document_repository
+
+    return get_document_repository()
+
+
+@pytest.fixture
+def library_repository():
+    """Provide a clean library repository for each test"""
+    from src.vector_db.api.dependencies import get_library_repository
+
+    return get_library_repository()

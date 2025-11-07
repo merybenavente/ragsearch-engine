@@ -29,23 +29,15 @@ class TestMetadata:
         assert metadata.username == username
         assert metadata.tags == tags
 
-    def test_metadata_update_timestamp(self):
+    def test_metadata_update_timestamp(self, mock_datetime):
         """Test updating metadata timestamp"""
         metadata = Metadata()
         original_time = metadata.last_update
 
-        # Use mock to ensure timestamp difference
-        from unittest.mock import patch
-        from datetime import datetime
+        updated_metadata = metadata.update_timestamp()
 
-        with patch("src.vector_db.domain.models.datetime") as mock_datetime:
-            later_time = datetime(2025, 12, 31, 23, 59, 59)
-            mock_datetime.now.return_value = later_time
-
-            updated_metadata = metadata.update_timestamp()
-
-            assert updated_metadata.last_update > original_time
-            assert updated_metadata.creation_time == metadata.creation_time
+        assert updated_metadata.last_update > original_time
+        assert updated_metadata.creation_time == metadata.creation_time
 
 
 class TestChunk:
@@ -318,22 +310,14 @@ class TestLibrary:
         library_vptree = Library.create(name="VPTree Library", index_type="vptree")
         assert library_vptree.index_type == "vptree"
 
-    def test_library_timestamp_updates(self):
+    def test_library_timestamp_updates(self, mock_datetime):
         """Test that library operations update timestamps"""
         library = Library(name="Test Library")
 
-        # Mock datetime to ensure we can detect timestamp changes
-        from unittest.mock import patch
-        from datetime import datetime
+        # Adding document reference should update timestamp
+        updated_library = library.add_document_reference(str(uuid4()))
+        assert updated_library.metadata.last_update == mock_datetime.now.return_value
 
-        with patch("src.vector_db.domain.models.datetime") as mock_datetime:
-            later_time = datetime(2025, 12, 31, 23, 59, 59)
-            mock_datetime.now.return_value = later_time
-
-            # Adding document reference should update timestamp
-            updated_library = library.add_document_reference(str(uuid4()))
-            assert updated_library.metadata.last_update == later_time
-
-            # Metadata updates should update timestamp
-            metadata_updated = library.update_metadata(name="New Name")
-            assert metadata_updated.metadata.last_update == later_time
+        # Metadata updates should update timestamp
+        metadata_updated = library.update_metadata(name="New Name")
+        assert metadata_updated.metadata.last_update == mock_datetime.now.return_value

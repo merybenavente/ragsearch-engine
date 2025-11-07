@@ -1,8 +1,6 @@
 """Test basic API functionality and imports"""
 
 import pytest
-from unittest.mock import patch, MagicMock
-from src.vector_db.domain.models import EMBEDDING_DIMENSION
 
 
 def test_basic_imports():
@@ -20,21 +18,11 @@ def test_basic_imports():
         pytest.fail(f"Import failed: {e}")
 
 
-@patch("src.vector_db.infrastructure.embedding_service.co")
-def test_create_document_function(mock_co):
+def test_create_document_function(mock_cohere_deterministic, vector_db_service):
     """Test the create_document service function"""
-    # Mock the Cohere API response
-    mock_response = MagicMock()
-    mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
-    mock_co.embed.return_value = mock_response
-
-    from src.vector_db.api.dependencies import get_vector_db_service
-
     text = "Test document content"
     username = "testuser"
     tags = ["test", "example"]
-
-    vector_db_service = get_vector_db_service()
 
     # First create a library
     library = vector_db_service.create_library(name="Test Library", username="testuser")
@@ -51,15 +39,12 @@ def test_create_document_function(mock_co):
     assert document.has_content()
 
 
-def test_create_library_function():
+def test_create_library_function(vector_db_service):
     """Test the create_library service function"""
-    from src.vector_db.api.dependencies import get_vector_db_service
-
     name = "Test Library"
     username = "testuser"
     tags = ["test", "example"]
 
-    vector_db_service = get_vector_db_service()
     library = vector_db_service.create_library(name=name, username=username, tags=tags)
 
     assert library.name == name
@@ -68,18 +53,8 @@ def test_create_library_function():
     assert len(library.document_ids) == 0
 
 
-@patch("src.vector_db.infrastructure.embedding_service.co")
-def test_integration_example(mock_co):
-    """Test creating library and adding documents"""
-    # Mock the Cohere API response
-    mock_response = MagicMock()
-    mock_response.embeddings = [[0.1] * EMBEDDING_DIMENSION]
-    mock_co.embed.return_value = mock_response
-
-    from src.vector_db.api.dependencies import get_vector_db_service
-
-    vector_db_service = get_vector_db_service()
-
+def test_library_document_workflow(mock_cohere_deterministic, vector_db_service):
+    """Test complete workflow of creating library and adding documents"""
     # Create library
     library = vector_db_service.create_library(
         name="Music Collection", username="Maria", tags=["personal", "favorites"]

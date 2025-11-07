@@ -59,7 +59,7 @@ class TestVectorDBServiceSearch:
             assert len(chunk.embedding) == EMBEDDING_DIMENSION
             assert isinstance(score, float)
 
-    def test_search_library_not_found(self, mock_cohere_deterministic):
+    def test_search_library_not_found(self):
         """Test searching non-existent library raises error"""
         fake_library_id = str(uuid4())
 
@@ -68,7 +68,7 @@ class TestVectorDBServiceSearch:
                 library_id=fake_library_id, query_text="test query"
             )
 
-    def test_search_empty_library(self, mock_cohere_deterministic):
+    def test_search_empty_library(self):
         """Test searching empty library returns empty results"""
         library = self.vector_db_service.create_library("Empty Library")
 
@@ -102,7 +102,7 @@ class TestVectorDBServiceSearch:
         for chunk, score in results:
             assert chunk.document_id == document.id
 
-    def test_search_with_invalid_parameters(self, mock_cohere_deterministic):
+    def test_search_with_invalid_parameters(self):
         """Test search operations with invalid parameters"""
         library = self.vector_db_service.create_library(name="Test Library")
 

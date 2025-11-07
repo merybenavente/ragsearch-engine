@@ -28,21 +28,14 @@ class TestVectorDBServiceLibrary:
             self.embedding_service,
         )
 
-    def test_create_library(self, mock_cohere_deterministic):
+    def test_create_library(self, mock_cohere_deterministic, sample_library_data):
         """Test creating a library"""
-        name = "Test Library"
-        username = "testuser"
-        tags = ["tag1", "tag2"]
-        index_type = "naive"
+        library = self.vector_db_service.create_library(**sample_library_data)
 
-        library = self.vector_db_service.create_library(
-            name=name, username=username, tags=tags, index_type=index_type
-        )
-
-        assert library.name == name
-        assert library.metadata.username == username
-        assert library.metadata.tags == tags
-        assert library.index_type == index_type
+        assert library.name == sample_library_data["name"]
+        assert library.metadata.username == sample_library_data["username"]
+        assert library.metadata.tags == sample_library_data["tags"]
+        assert library.index_type == sample_library_data["index_type"]
         assert library.document_ids == set()
 
         # Verify library is persisted
@@ -50,7 +43,7 @@ class TestVectorDBServiceLibrary:
         assert retrieved_library is not None
         assert retrieved_library.id == library.id
 
-    def test_create_library_with_defaults(self, mock_cohere_deterministic):
+    def test_create_library_with_defaults(self):
         """Test creating a library with default values"""
         name = "Simple Library"
 
@@ -61,7 +54,7 @@ class TestVectorDBServiceLibrary:
         assert library.metadata.tags == []
         assert library.index_type == "naive"
 
-    def test_update_library_metadata(self, mock_cohere_deterministic):
+    def test_update_library_metadata(self):
         """Test updating library metadata"""
         library = self.vector_db_service.create_library("Original Library")
 
@@ -98,7 +91,7 @@ class TestVectorDBServiceLibrary:
         # Verify document is deleted
         assert self.vector_db_service.get_document(document.id) is None
 
-    def test_list_libraries(self, mock_cohere_deterministic):
+    def test_list_libraries(self):
         """Test listing all libraries"""
         # Create a few libraries
         self.vector_db_service.create_library(name="Library 1")
@@ -132,7 +125,7 @@ class TestVectorDBServiceLibrary:
         assert doc1.id in doc_ids
         assert doc2.id in doc_ids
 
-    def test_library_operations_with_invalid_data(self, mock_cohere_deterministic):
+    def test_library_operations_with_invalid_data(self):
         """Test library operations with invalid data"""
         # Test create library with empty name
         with pytest.raises(ValueError):

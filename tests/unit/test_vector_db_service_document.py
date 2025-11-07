@@ -5,7 +5,6 @@ from uuid import uuid4
 
 from src.vector_db.application.vector_db_service import VectorDBService
 from src.vector_db.domain.models import Document, EMBEDDING_DIMENSION
-from src.vector_db.domain.interfaces import EmbeddingService
 from src.vector_db.infrastructure.repositories import RepositoryManager
 from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
 from src.vector_db.infrastructure.index_factory import IndexFactory
@@ -63,7 +62,7 @@ class TestVectorDBServiceDocument:
             assert len(chunk.embedding) == EMBEDDING_DIMENSION
             assert chunk.document_id == document.id
 
-    def test_create_document_library_not_found(self, mock_cohere_deterministic):
+    def test_create_document_library_not_found(self):
         """Test creating document in non-existent library raises error"""
         fake_library_id = str(uuid4())
 
@@ -72,7 +71,7 @@ class TestVectorDBServiceDocument:
                 library_id=fake_library_id, text="Test text"
             )
 
-    def test_create_empty_document(self, mock_cohere_deterministic):
+    def test_create_empty_document(self):
         """Test creating an empty document"""
         library = self.vector_db_service.create_library(name="Test Library")
         document = self.vector_db_service.create_empty_document(
@@ -119,7 +118,7 @@ class TestVectorDBServiceDocument:
         full_text = updated_document.get_full_text()
         assert "Updated content" in full_text
 
-    def test_document_operations_with_invalid_ids(self, mock_cohere_deterministic):
+    def test_document_operations_with_invalid_ids(self):
         """Test document operations with invalid IDs"""
         fake_id = str(uuid4())
 
@@ -133,20 +132,13 @@ class TestVectorDBServiceDocument:
                 document_id=fake_id, new_text="Updated content"
             )
 
-    def test_embedding_service_failure_handling(self, mock_cohere_deterministic):
+    def test_embedding_service_failure_handling(self, mock_embedding_service_failure):
         """Test handling of embedding service failures"""
         library = self.vector_db_service.create_library(name="Test Library")
 
-        # Mock embedding service to raise exception
+        # Replace embedding service with failing one
         original_embedding_service = self.vector_db_service.embedding_service
-
-        class FailingEmbeddingService(EmbeddingService):
-            def create_embedding(
-                self, text: str, input_type: str = "search_document"
-            ) -> list[float]:
-                raise RuntimeError("Embedding service failed")
-
-        self.vector_db_service.embedding_service = FailingEmbeddingService()
+        self.vector_db_service.embedding_service = mock_embedding_service_failure
 
         # Test that document creation fails gracefully
         with pytest.raises(RuntimeError):
