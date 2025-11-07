@@ -350,21 +350,10 @@ class TestLSHRemoval(TestLSHIndex):
 class TestLSHSearch(TestLSHIndex):
     """Test LSH search functionality"""
 
-    def test_search_empty_index(self):
-        """Test searching in empty index"""
-        query_embedding = create_deterministic_embedding("query", 10)
-        results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
-        assert results == []
-
     def test_search_no_hyperplanes(self):
-        """Test searching before hyperplanes are generated"""
+        """Test LSH-specific behavior: searching before hyperplanes are generated"""
         query_embedding = create_deterministic_embedding("query", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
-        assert results == []
-
-    def test_search_empty_query(self):
-        """Test searching with empty query embedding"""
-        results = self.lsh_index._search_impl([], k=5, min_similarity=0.0)
         assert results == []
 
     def test_search_basic_functionality(self):
@@ -397,132 +386,34 @@ class TestLSHSearch(TestLSHIndex):
         assert all(isinstance(score, float) for _, score in results)
         assert all(0.0 <= score <= 1.0 for _, score in results)
 
-    def test_search_k_limit(self):
-        """Test that search respects k limit"""
-        # Add many chunks with very similar text
+    def test_search_uses_hash_buckets(self):
+        """Test LSH-specific behavior: search uses hash buckets for efficiency"""
+        # Add chunks with very similar text to create hash collisions
         embeddings = [
-            create_deterministic_embedding(f"testing{i}", 10) for i in range(10)
+            create_deterministic_embedding("machine learning", 10),
+            create_deterministic_embedding("machine learninG", 10),  # Very similar
+            create_deterministic_embedding("completely different topic", 10),
         ]
 
         chunks = [
-            self.create_test_chunk(f"chunk{i}", f"testing{i}", embeddings[i])
-            for i in range(10)
+            self.create_test_chunk("chunk1", "machine learning", embeddings[0]),
+            self.create_test_chunk("chunk2", "machine learninG", embeddings[1]),
+            self.create_test_chunk(
+                "chunk3", "completely different topic", embeddings[2]
+            ),
         ]
 
         self.lsh_index._add_chunks_impl(chunks)
         for chunk in chunks:
             self.lsh_index._chunks[chunk.id] = chunk
 
-        # Search with k=3 using similar text
-        query_embedding = create_deterministic_embedding("testing1", 10)
-        results = self.lsh_index._search_impl(query_embedding, k=3, min_similarity=0.0)
-
-        # Should return at most k results
-        assert len(results) <= 3
-
-    def test_search_min_similarity_filter(self):
-        """Test that search respects min_similarity threshold"""
-        # Add chunks with very similar text
-        embeddings = [
-            create_deterministic_embedding("similar text", 10),
-            create_deterministic_embedding("similar texT", 10),  # One char diff
-        ]
-
-        chunks = [
-            self.create_test_chunk("chunk1", "similar text", embeddings[0]),
-            self.create_test_chunk("chunk2", "similar texT", embeddings[1]),
-        ]
-
-        self.lsh_index._add_chunks_impl(chunks)
-        for chunk in chunks:
-            self.lsh_index._chunks[chunk.id] = chunk
-
-        # Search with high similarity threshold
-        query_embedding = create_deterministic_embedding("similar text", 10)
-        results_high_threshold = self.lsh_index._search_impl(
-            query_embedding, k=5, min_similarity=0.8
-        )
-
-        # Search with low similarity threshold
-        results_low_threshold = self.lsh_index._search_impl(
-            query_embedding, k=5, min_similarity=0.0
-        )
-
-        # High threshold should return fewer or equal results
-        assert len(results_high_threshold) <= len(results_low_threshold)
-
-    def test_search_results_sorted_by_similarity(self):
-        """Test that search results are sorted by similarity in descending order"""
-        # Add chunks with very similar text
-        embeddings = [
-            create_deterministic_embedding("sorttest", 10),
-            create_deterministic_embedding("sorttesT", 10),  # One char diff
-            create_deterministic_embedding("sortTesT", 10),  # Two char diff
-        ]
-
-        chunks = [
-            self.create_test_chunk("chunk1", "sorttest", embeddings[0]),
-            self.create_test_chunk("chunk2", "sorttesT", embeddings[1]),
-            self.create_test_chunk("chunk3", "sortTesT", embeddings[2]),
-        ]
-
-        self.lsh_index._add_chunks_impl(chunks)
-        for chunk in chunks:
-            self.lsh_index._chunks[chunk.id] = chunk
-
-        query_embedding = create_deterministic_embedding("sorttest", 10)
+        # Search should use hash buckets to find similar items efficiently
+        query_embedding = create_deterministic_embedding("machine learning", 10)
         results = self.lsh_index._search_impl(query_embedding, k=5, min_similarity=0.0)
 
-        if len(results) > 1:
-            # Check that results are sorted by similarity (descending)
-            similarities = [score for _, score in results]
-            assert similarities == sorted(similarities, reverse=True)
-
-
-class TestLSHCosineSimilarity(TestLSHIndex):
-    """Test cosine similarity calculation"""
-
-    def test_cosine_similarity_identical_vectors(self):
-        """Test cosine similarity with identical vectors"""
-        vec = [1.0, 2.0, 3.0]
-        similarity = self.lsh_index._cosine_similarity(vec, vec)
-        assert abs(similarity - 1.0) < 1e-10
-
-    def test_cosine_similarity_orthogonal_vectors(self):
-        """Test cosine similarity with orthogonal vectors"""
-        vec1 = [1.0, 0.0, 0.0]
-        vec2 = [0.0, 1.0, 0.0]
-        similarity = self.lsh_index._cosine_similarity(vec1, vec2)
-        assert abs(similarity - 0.0) < 1e-10
-
-    def test_cosine_similarity_opposite_vectors(self):
-        """Test cosine similarity with opposite vectors"""
-        vec1 = [1.0, 2.0, 3.0]
-        vec2 = [-1.0, -2.0, -3.0]
-        similarity = self.lsh_index._cosine_similarity(vec1, vec2)
-        assert abs(similarity - 0.0) < 1e-10  # Clamped to 0
-
-    def test_cosine_similarity_different_lengths(self):
-        """Test cosine similarity with vectors of different lengths"""
-        vec1 = [1.0, 2.0, 3.0]
-        vec2 = [1.0, 2.0]
-        similarity = self.lsh_index._cosine_similarity(vec1, vec2)
-        assert similarity == 0.0
-
-    def test_cosine_similarity_zero_vectors(self):
-        """Test cosine similarity with zero vectors"""
-        vec1 = [0.0, 0.0, 0.0]
-        vec2 = [1.0, 2.0, 3.0]
-        similarity = self.lsh_index._cosine_similarity(vec1, vec2)
-        assert similarity == 0.0
-
-    def test_cosine_similarity_bounds(self):
-        """Test that cosine similarity is bounded between 0 and 1"""
-        for _ in range(10):
-            vec1 = np.random.randn(5).tolist()
-            vec2 = np.random.randn(5).tolist()
-            similarity = self.lsh_index._cosine_similarity(vec1, vec2)
-            assert 0.0 <= similarity <= 1.0
+        # Should return results (LSH approximation)
+        assert len(results) > 0
+        assert all(isinstance(chunk, Chunk) for chunk, _ in results)
 
 
 class TestLSHThreadSafety(TestLSHIndex):

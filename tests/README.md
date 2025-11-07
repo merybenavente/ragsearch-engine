@@ -18,8 +18,10 @@ tests/
 │   ├── test_vector_db_service_integration.py # Service integration tests
 │   ├── test_api_functions.py           # Basic API function tests
 │   ├── test_index_factory.py           # Index factory tests
-│   ├── test_lsh_index.py               # LSH index implementation tests
-│   └── test_vptree_index.py            # VPTree index implementation tests
+│   ├── test_index_base.py              # BaseVectorIndex shared functionality tests
+│   ├── test_naive.py                   # NaiveIndex linear search tests
+│   ├── test_index_lsh.py               # LSH index algorithm-specific tests
+│   └── test_index_vptree.py            # VPTree index algorithm-specific tests
 └── integration/                        # Integration and end-to-end tests
     ├── test_api_endpoints.py           # API endpoint integration tests
     ├── test_complete_workflow.py       # End-to-end workflow tests
@@ -35,6 +37,32 @@ tests/
 - **Dependencies**: Use mocks and stubs to isolate system under test
 - **Speed**: Fast (< 100ms per test)
 - **Coverage**: Aim for 90%+ code coverage
+
+**Vector Index Test Organization:**
+The vector index tests are organized to eliminate redundancy and focus on specific functionality:
+
+- **`test_index_base.py`**: Tests shared BaseVectorIndex functionality
+  - Thread safety and concurrency control
+  - Chunk storage and document management
+  - Cosine similarity calculations
+  - Public API contracts
+
+- **`test_naive.py`**: Tests NaiveIndex-specific behavior
+  - Linear search characteristics
+  - No indexing overhead validation
+  - Baseline accuracy verification
+
+- **`test_index_lsh.py`**: Tests LSH algorithm-specific features
+  - Hash function generation and reproducibility
+  - Hyperplane-based bucketing
+  - Approximate search behavior
+  - Hash table management
+
+- **`test_index_vptree.py`**: Tests VP-Tree algorithm-specific features
+  - Tree structure and node organization
+  - Distance-based partitioning
+  - Triangle inequality pruning
+  - Tree rebuilding behavior
 
 #### 🔗 Integration Tests (`tests/integration/`)
 - **Purpose**: Test component interactions and workflows
@@ -189,7 +217,7 @@ pytest tests/integration/test_semantic_search_quality.py
 - ✅ Repository layer (DocumentRepository, LibraryRepository)
 - ✅ API endpoints
 - ✅ Search functionality
-- ✅ Index implementations (LSH, VPTree, Index Factory)
+- ✅ Index implementations (BaseVectorIndex, NaiveIndex, LSH, VPTree, Index Factory)
 
 
 ### Test Debugging
