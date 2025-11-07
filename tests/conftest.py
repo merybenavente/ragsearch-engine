@@ -170,3 +170,32 @@ def library_repository():
     from src.vector_db.api.dependencies import get_library_repository
 
     return get_library_repository()
+
+
+@pytest.fixture
+def vector_db_service_instance():
+    """Provide a fully configured VectorDBService instance for tests that need manual setup"""
+    from src.vector_db.application.vector_db_service import VectorDBService
+    from src.vector_db.infrastructure.repositories import RepositoryManager
+    from src.vector_db.infrastructure.search_index import RepositoryAwareSearchIndex
+    from src.vector_db.infrastructure.index_factory import IndexFactory
+    from src.vector_db.infrastructure.embedding_service import CohereEmbeddingService
+
+    repo_manager = RepositoryManager()
+    search_index = RepositoryAwareSearchIndex(IndexFactory())
+    embedding_service = CohereEmbeddingService()
+
+    return VectorDBService(
+        repo_manager.get_document_repository(),
+        repo_manager.get_library_repository(),
+        search_index,
+        embedding_service,
+    )
+
+
+@pytest.fixture
+def index_factory_instance():
+    """Provide an IndexFactory instance for testing"""
+    from src.vector_db.infrastructure.index_factory import IndexFactory
+
+    return IndexFactory()
