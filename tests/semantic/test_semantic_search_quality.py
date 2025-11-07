@@ -19,10 +19,20 @@ class TestSemanticSearchQuality:
         if not os.getenv("COHERE_API_KEY"):
             pytest.fail("COHERE_API_KEY environment variable not set")
 
-    def test_semantic_similarity_basic(self):
+    @pytest.mark.parametrize(
+        "index_type,index_params",
+        [
+            ("naive", None),
+            ("vptree", None),
+            ("lsh", {"num_tables": 4, "num_hyperplanes": 2}),
+        ],
+    )
+    def test_semantic_similarity_basic(self, index_type, index_params):
         """Test basic semantic similarity with clear content hierarchy"""
         # Create a library first
-        library = self.vector_db_service.create_library(name="Test Library")
+        library = self.vector_db_service.create_library(
+            name="Test Library", index_type=index_type, index_params=index_params
+        )
 
         # Create a document about a specific, concrete topic
         document = self.vector_db_service.create_document(
@@ -277,65 +287,3 @@ class TestSemanticSearchQuality:
         assert (
             python_score >= web_dev_score * 0.8
         ), "Python query should be more relevant than web development"
-
-    def test_semantic_similarity_lsh_index(self):
-        """Test semantic search using LSH index with custom hyperparameters"""
-        # Create a library with LSH index: 1 bucket, 6 planes
-        library = self.vector_db_service.create_library(
-            name="LSH Test Library",
-            index_type="lsh",
-            index_params={"num_tables": 4, "num_hyperplanes": 2},
-        )
-
-        # Create a document with chunk size 60
-        document = self.vector_db_service.create_document(
-            library_id=library.id,
-            text="Machine learning is a subset of artificial intelligence that uses statistical "
-            "techniques to give computers the ability to learn from data without being "
-            "explicitly programmed. Deep learning uses neural networks with multiple layers "
-            "to model high-level abstractions in data. Natural language processing enables "
-            "computers to understand and generate human language.",
-            chunk_size=60,
-        )
-
-        # Test semantic search with LSH index
-        queries = [
-            "machine learning",  # Direct match
-            "artificial intelligence",  # Related concept
-            "neural networks",  # Related concept
-            "data processing",  # Somewhat related
-            "cooking recipes",  # Unrelated
-        ]
-
-        print(
-            "docs in library",
-            len(self.vector_db_service.get_documents_in_library(library.id)),
-        )
-        # Get all scores
-        scores = {}
-        for query in queries:
-            results = self.vector_db_service.search_document(
-                document_id=document.id, query_text=query, k=3, min_similarity=0.0
-            )
-            scores[query] = [
-                chunk_score_tuple[1]
-                for chunk_score_tuple in results
-                if chunk_score_tuple
-            ]
-
-        # Test that LSH index provides meaningful semantic ranking
-        assert (
-            sum(scores["machine learning"]) > sum(scores["cooking recipes"])
-        ), f"ML terms should score higher than unrelated content with LSH index {scores['machine learning']}"
-        assert sum(scores["artificial intelligence"]) > sum(
-            scores["cooking recipes"]
-        ), "AI terms should score higher than unrelated content with LSH index"
-        assert (
-            sum(scores["neural networks"]) > sum(scores["cooking recipes"])
-        ), "Neural network terms should score higher than unrelated content with LSH index"
-
-        # Verify that all queries return results (LSH should not filter out everything)
-        for query in queries:
-            assert (
-                all(scores[query]) > 0.0
-            ), f"LSH index should return results for query: {query}"
