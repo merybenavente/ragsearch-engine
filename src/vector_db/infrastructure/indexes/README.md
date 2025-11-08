@@ -7,9 +7,6 @@ This directory contains three different vector indexing algorithms, each optimiz
 
 ## Algorithm Comparison
 
-<!-- TODO: rename Exactness -->
-<!-- TODO: review memory column -->
-<!-- Review Search Speed degradation -->
 | Algorithm |   Type   | Result Guarantee | Config |   Memory Usage   |  Indexing Speed   |   Search Speed   |  Update Cost  | Dataset Size |
 |:---------:|:--------:|:---------:|:------:|:---------------:|:-----------------:|:----------------:|:-------------:|:------------:|
 | [Naive](naive.py)   | Brute Force | Exact   | None  | • Baseline<br>• O(n×d) | O(n×d) | O(n×d) | O(1) | < 10 K |
