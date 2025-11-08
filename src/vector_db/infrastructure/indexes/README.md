@@ -9,9 +9,9 @@ This directory contains three different vector indexing algorithms, each optimiz
 
 | Algorithm |   Type   | Result Guarantee | Config |   Memory Usage   |  Indexing Speed   |   Search Speed   |  Update Cost  | Dataset Size |
 |:---------:|:--------:|:---------:|:------:|:---------------:|:-----------------:|:----------------:|:-------------:|:------------:|
-| [Naive](naive.py)   | Brute Force | Exact   | None  | • Baseline<br>• O(n×d) | O(n×d) | O(n×d) | O(1) | < 10 K |
-| [LSH](lsh.py)      | Hashing     | Approx.<br>(tunable**) | High  | • High<br>• O(n×d + n×L) | O(n×L×k×d) | O(L×k×d + c) | O(L×k×d) | > 10 K |
-| [VP‑Tree](vptree.py)| Tree‑based  | Exact   | Low   | • Medium<br>• O(n) | O(n log n×d) | O(log n×d)† | O(n log n×d) | 1 K–100 K |
+| [Naive](naive.py)   | Brute Force | Exact   | None  | • Baseline<br>• O(n×d) | O(n×d) | O(n×d) | O(d) | < 10 K |
+| [LSH](lsh.py)      | Hashing     | Approx.<br>(tunable**) | High  | • High<br>• O(n×d + n×L) | O(n×L×k×d) | O(L×k×d + c×d) | O(L×k×d) | > 10 K |
+| [VP‑Tree](vptree.py)| Tree‑based  | Exact   | Low   | • Medium<br>• O(n×d) | O(n log n×d) | O(log n×d)† | O(n log n×d) | 1 K–100 K |
 
 
 
