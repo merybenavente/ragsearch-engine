@@ -30,6 +30,7 @@ class TestVectorDBServiceIntegration:
 
     def test_integration_workflow(self, mock_cohere_deterministic):
         """Test complete workflow integration"""
+        self.embedding_service._client = mock_cohere_deterministic
         # Create library
         library = self.vector_db_service.create_library(
             name="Integration Test Library",
@@ -77,6 +78,7 @@ class TestVectorDBServiceIntegration:
 
     def test_concurrent_operations_safety(self, mock_cohere_deterministic):
         """Test basic concurrent operations safety"""
+        self.embedding_service._client = mock_cohere_deterministic
         library = self.vector_db_service.create_library(name="Concurrent Test Library")
 
         # Create multiple documents in sequence (simulating concurrent operations)
@@ -99,6 +101,7 @@ class TestVectorDBServiceIntegration:
 
     def test_error_recovery_workflow(self, mock_cohere_deterministic):
         """Test system behavior during error conditions"""
+        self.embedding_service._client = mock_cohere_deterministic
         library = self.vector_db_service.create_library(name="Error Recovery Test")
 
         # Create a valid document first
@@ -125,6 +128,7 @@ class TestVectorDBServiceIntegration:
 
     def test_full_crud_workflow(self, mock_cohere_deterministic):
         """Test complete CRUD workflow for libraries and documents"""
+        self.embedding_service._client = mock_cohere_deterministic
         # CREATE: Library and documents
         library = self.vector_db_service.create_library(
             name="CRUD Test Library", username="crud_user", tags=["crud", "test"]

@@ -6,6 +6,7 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 from src.vector_db.infrastructure.logging import configure_logging, LogLevel
+from src.vector_db.domain.models import EMBEDDING_DIMENSION
 from tests.utils import create_deterministic_embedding
 
 
@@ -14,7 +15,7 @@ from tests.utils import create_deterministic_embedding
 # ============================================================================
 
 
-def pytest_configure(config):
+def pytest_configure():
     """Configure pytest settings"""
     # Configure logging for tests
     configure_logging(level=LogLevel.ERROR, json_format=False)
@@ -68,24 +69,47 @@ def sample_document_data():
 
 @pytest.fixture
 def mock_cohere_deterministic():
-    """Mock Cohere embedding API with deterministic embeddings based on text content"""
-    from src.vector_db.domain.models import EMBEDDING_DIMENSION
+    """Mock Cohere embedding API with deterministic embeddings."""
 
-    with patch("src.vector_db.infrastructure.cohere_embedding_service.co") as mock_co:
+    def mock_embed_response(texts, **kwargs):
+        """Create deterministic mock response for Cohere embed API"""
+        if isinstance(texts, str):
+            texts = [texts]
 
-        def mock_embed(texts, **kwargs):
-            if isinstance(texts, str):
-                texts = [texts]
-            embeddings = [
-                create_deterministic_embedding(text, EMBEDDING_DIMENSION)
-                for text in texts
-            ]
-            mock_response = MagicMock()
-            mock_response.embeddings = embeddings
-            return mock_response
+        embeddings = [
+            create_deterministic_embedding(text, EMBEDDING_DIMENSION) for text in texts
+        ]
 
-        mock_co.embed = mock_embed
-        yield mock_co
+        mock_response = MagicMock()
+        mock_response.embeddings = embeddings
+        return mock_response
+
+    mock_client_instance = MagicMock()
+    mock_client_instance.embed = mock_embed_response
+
+    # Targeted approach: only patch when this fixture is explicitly requested
+    # This allows semantic tests to make real API calls when they don't use this fixture
+    with patch("cohere.Client", return_value=mock_client_instance), patch.dict(
+        "os.environ", {"COHERE_API_KEY": "test-key"}
+    ):
+        try:
+            from src.vector_db.api.dependencies import get_embedding_service
+
+            existing_service = get_embedding_service()
+            # Store original client to restore later if needed
+            original_client = getattr(existing_service, "_client", None)
+            existing_service._client = mock_client_instance
+        except Exception:
+            original_client = None
+
+        yield mock_client_instance
+
+        # Restore original client if it existed (though this is rarely needed)
+        try:
+            if original_client is not None:
+                existing_service._client = original_client
+        except Exception:
+            pass
 
 
 # ============================================================================
@@ -160,7 +184,7 @@ def library_repository():
 
 
 @pytest.fixture
-def vector_db_service_instance():
+def vector_db_service_instance(mock_cohere_deterministic):
     """Provide a fully configured VectorDBService instance for tests that need manual setup"""
     from src.vector_db.application.vector_db_service import VectorDBService
     from src.vector_db.infrastructure.repositories import RepositoryManager
