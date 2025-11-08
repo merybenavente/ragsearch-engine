@@ -7,14 +7,19 @@ This directory contains three different vector indexing algorithms, each optimiz
 
 ## Algorithm Comparison
 
-| Algorithm | Type | Exactness | Config | Memory Usage | Indexing Speed | &nbsp;Search Speed&nbsp; | &nbsp;Update Cost&nbsp; | Dataset Size |
-|:---------:|:----:|:---------:|:------:|:-----------:|:--------------:|:------------:|:-----------:|:------------:|
-| [Naive](naive.py) | Brute&nbsp;Force | Exact | None | • Low<br>• O(n×d) | • Fast<br>• O(1) | • Slow<br>• O(n×d) | • Fast<br>• O(1) | < 10 K |
-| [LSH](lsh.py) | Hashing | Approx.<br>(~90‑95 %**) | High | • High<br>• O(n×L) | • Slow<br>• O(n×L×k×d) | • Fast<br>• O(L×k×d + c) | • Medium<br>• O(L×k×d) | > 10 K |
-| [VP‑Tree](vptree.py) | Tree‑based | Exact | Low | • Medium<br>• O(n) | • Medium<br>• O(n log n×d) | • Medium<br>• O(log n×d) | • Slow<br>• O(n log n×d) | 1 K–100 K |
+<!-- TODO: rename Exactness -->
+<!-- TODO: review memory column -->
+<!-- Review Search Speed degradation -->
+| Algorithm |   Type   | Result Guarantee | Config |   Memory Usage   |  Indexing Speed   |   Search Speed   |  Update Cost  | Dataset Size |
+|:---------:|:--------:|:---------:|:------:|:---------------:|:-----------------:|:----------------:|:-------------:|:------------:|
+| [Naive](naive.py)   | Brute Force | Exact   | None  | • Baseline<br>• O(n×d) | O(n×d) | O(n×d) | O(1) | < 10 K |
+| [LSH](lsh.py)      | Hashing     | Approx.<br>(tunable**) | High  | • High<br>• O(n×d + n×L) | O(n×L×k×d) | O(L×k×d + c) | O(L×k×d) | > 10 K |
+| [VP‑Tree](vptree.py)| Tree‑based  | Exact   | Low   | • Medium<br>• O(n) | O(n log n×d) | O(log n×d)† | O(n log n×d) | 1 K–100 K |
 
 
 
 *L = num_tables, k = num_hyperplanes, d = embedding dimension, c = candidates found
 
 **LSH accuracy depends heavily on parameter tuning and data distribution
+
+† In high‑dimensional spaces (>≈15 dims) VP‑Tree search tends toward **O(n×d)**.
