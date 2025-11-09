@@ -10,7 +10,7 @@ A FastAPI-based REST API for vector database operations with document indexing a
 - **Library Organization**: Organize documents into libraries with metadata
 - **Thread-Safe Operations**: Concurrent access support with proper locking
 - **Structured Logging**: Comprehensive logging with performance metrics
-- **Comprehensive Testing**: 100+ tests covering all functionality
+- **Comprehensive Testing**: 150+ tests covering all functionality
 - **Docker Support**: Containerized deployment ready
 
 ## Architecture
@@ -25,7 +25,7 @@ src/vector_db/
 └── infrastructure/ # Infrastructure (repositories, logging, external services)
 ```
 
-The architecture implements a comprehensive dependency injection pattern where all services are provided through abstract interfaces, enabling easy testing and flexible embedding provider swapping. The `EmbeddingService` interface abstracts vector generation from the business logic, while the application layer orchestrates document chunking and embedding generation to ensure chunks are always created with their corresponding vector embeddings. This design separates concerns cleanly: domain models focus on business rules, application services handle use cases and orchestration, infrastructure services manage external dependencies (like the Cohere API), and the API layer provides a consistent RESTful interface with proper error handling and dependency injection throughout.
+The architecture implements clean separation of concerns through a layered design with comprehensive dependency injection. All services use abstract interfaces to enable easy testing and flexible provider swapping. The domain layer defines core business entities (Libraries, Documents, Chunks) and their relationships, while the application layer orchestrates complex workflows like document processing, chunking, and search operations. The infrastructure layer handles external integrations (embedding providers, vector indices) and data persistence, supporting multiple index types (naive, LSH, VPTree) with configurable parameters for different performance characteristics. The API layer provides a consistent RESTful interface with proper error handling, request validation, and response formatting, all connected through dependency injection for maintainability and testability.
 
 ### Key Components
 
