@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RAGSearch Engine",
-    description="A production-ready semantic search engine for RAG applications with multiple vector index implementations. Built with FastAPI, featuring clean architecture, comprehensive testing, and production-ready features.",
+    description="A personal project exploring semantic search for RAG applications with multiple vector index implementations. Built with FastAPI, featuring clean architecture and comprehensive testing.",
     version="0.1.0",
     lifespan=lifespan,
 )

@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "vector-db"
 version = "0.1.0"
-description = "A production-ready REST API for semantic search and document indexing with multiple vector index implementations"
-authors = ["mbenavente"]
+description = "A personal project exploring semantic search and document indexing with multiple vector index implementations"
+authors = ["María Benavente"]
 readme = "README.md"
 packages = [{include = "vector_db", from = "src"}]
 keywords = ["vector-database", "semantic-search", "fastapi", "rag", "embeddings", "nlp"]
