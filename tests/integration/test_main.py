@@ -8,7 +8,7 @@ def test_root_endpoint():
     """Test the root endpoint"""
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Vector Database API is running"}
+    assert response.json() == {"message": "RAGSearch Engine is running"}
 
 
 def test_health_check():
@@ -17,5 +17,5 @@ def test_health_check():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["service"] == "vector-db"
+    assert data["service"] == "ragsearch-engine"
     assert data["version"] == "0.1.0"

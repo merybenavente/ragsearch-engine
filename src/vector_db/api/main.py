@@ -15,35 +15,50 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
-    logger.info("Vector Database API starting up", version="0.1.0")
+    logger.info("RAGSearch Engine starting up", version="0.1.0")
 
     # Check for required environment variables
     if not os.environ.get("COHERE_API_KEY"):
         logger.warning(
             "COHERE_API_KEY not found in environment variables. "
             "Embedding operations will fail at runtime. "
-            "Please set COHERE_API_KEY to use the vector database."
+            "Please set COHERE_API_KEY to use RAGSearch Engine."
         )
 
     yield
     # Shutdown
-    logger.info("Vector Database API shutting down")
+    logger.info("RAGSearch Engine shutting down")
 
 
 app = FastAPI(
-    title="Vector Database API",
-    description="A FastAPI backend for vector database operations with document indexing and similarity search",
+    title="RAGSearch Engine",
+    description="A production-ready semantic search engine for RAG applications with multiple vector index implementations. Built with FastAPI, featuring clean architecture, comprehensive testing, and production-ready features.",
     version="0.1.0",
     lifespan=lifespan,
 )
 
+# Configure CORS from environment variables
+# CORS_ORIGINS can be:
+# - Comma-separated list: "https://example.com,https://app.example.com"
+# - "*" for all origins (development only)
+# - Empty/unset defaults to ["*"] for backward compatibility
+cors_origins_env = os.environ.get("CORS_ORIGINS", "*")
+if cors_origins_env == "*":
+    cors_origins = ["*"]
+elif cors_origins_env == "":
+    cors_origins = ["*"]  # Default to permissive for development
+else:
+    # Parse comma-separated origins
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -54,7 +69,7 @@ app.include_router(vector_db.router, prefix="/api/v1")
 async def root():
     """Health check endpoint"""
     logger.info("Health check endpoint accessed")
-    return {"message": "Vector Database API is running"}
+    return {"message": "RAGSearch Engine is running"}
 
 
 @app.get("/health")
@@ -63,7 +78,7 @@ async def health_check():
     logger.info("Detailed health check endpoint accessed")
     return {
         "status": "healthy",
-        "service": "vector-db",
+        "service": "ragsearch-engine",
         "version": "0.1.0",
         "endpoints": {
             "libraries": "/api/v1/libraries",

@@ -18,7 +18,7 @@ class TestHealthEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["message"] == "Vector Database API is running"
+        assert data["message"] == "RAGSearch Engine is running"
 
     def test_health_endpoint(self):
         """Test detailed health check endpoint"""
@@ -27,7 +27,7 @@ class TestHealthEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["service"] == "vector-db"
+        assert data["service"] == "ragsearch-engine"
         assert data["version"] == "0.1.0"
         assert "endpoints" in data
 
