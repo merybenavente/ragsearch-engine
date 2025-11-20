@@ -5,7 +5,6 @@
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Tests](https://img.shields.io/badge/Tests-150%2B-passing-brightgreen.svg)
 
 **A personal project built for fun - a semantic search engine for RAG applications with multiple vector index implementations**
 
