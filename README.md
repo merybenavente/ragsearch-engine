@@ -1,4 +1,4 @@
-# 🚀 RAGSearch Engine
+# RAG Search Engine
 
 <div align="center">
 
