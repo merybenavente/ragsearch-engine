@@ -1,11 +1,10 @@
-# RAGSearch Engine
+# RAG Search Engine
 
 A from-scratch approximate nearest neighbor search engine with three indexing strategies, built on FastAPI for RAG retrieval workloads.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Tests](https://img.shields.io/badge/Tests-150%2B-passing-brightgreen.svg)
 
 ---
 
