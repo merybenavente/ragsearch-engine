@@ -1,225 +1,151 @@
-# 🚀 RAGSearch Engine
+# RAGSearch Engine
 
-<div align="center">
+A from-scratch approximate nearest neighbor search engine with three indexing strategies, built on FastAPI for RAG retrieval workloads.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Tests](https://img.shields.io/badge/Tests-150%2B-passing-brightgreen.svg)
 
-**A personal project built for fun - a semantic search engine for RAG applications with multiple vector index implementations**
+---
 
-[Features](#-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [API Documentation](#-api-documentation) • [Tech Stack](#-tech-stack)
+## What this is
 
-</div>
+A vector search engine that implements three index structures from scratch — Naive (brute-force), LSH (locality-sensitive hashing), and VP-Tree (vantage-point tree) — each with different trade-offs in latency, recall, and memory. The system exposes a REST API for document ingestion, chunking, embedding (via Cohere), and similarity search, organized around a domain-driven architecture with dependency injection, full type checking, and 150+ tests across unit, integration, and semantic quality layers.
+
+### Index strategies
+
+| Index | Algorithm | Search complexity | Results | Use case |
+|-------|-----------|-------------------|---------|----------|
+| **Naive** | Exhaustive linear scan | O(n * d) | Exact | Baseline, small corpora (<1K vectors) |
+| **LSH** | Multi-table random hyperplane hashing | O(d * L * k + candidates) | Approximate | Large corpora, latency-sensitive retrieval |
+| **VP-Tree** | Binary metric tree with triangle inequality pruning | O(log n * d) expected | Exact | Medium corpora, exact results with sublinear search |
+
+Each library can be configured with a different index type and tunable parameters (e.g., `num_tables`/`num_hyperplanes` for LSH, `leaf_size` for VP-Tree). Indexes are library-scoped, thread-safe (`RLock`), and use deterministic seeding for reproducibility.
 
 ---
 
-## 📋 Overview
+## Architecture
 
-RAGSearch Engine is a personal project exploring semantic search concepts with FastAPI, designed for RAG (Retrieval Augmented Generation) applications. It enables semantic search, document indexing, and similarity matching with multiple vector index implementations. Built for fun and learning, this project demonstrates clean architecture principles, domain-driven design, and software engineering best practices.
-
-### Key Highlights
-
-- 🎯 **Multiple Index Types**: Naive, LSH (Locality-Sensitive Hashing), and VPTree implementations
-- 🔍 **Semantic Search**: Powered by Cohere embeddings for intelligent text similarity
-- 🏗️ **Clean Architecture**: Domain-Driven Design with clear separation of concerns
-- 🧪 **Comprehensive Testing**: 150+ tests covering unit, integration, and semantic quality
-- 🚀 **Well Engineered**: Docker support, structured logging, and error handling
-- ⚡ **High Performance**: Configurable index parameters for optimal performance
-
----
-
-## ✨ Features
-
-### Core Functionality
-- **Document Management**: Full CRUD operations for documents within organized libraries
-- **Automatic Chunking**: Intelligent text splitting for optimal search performance
-- **Vector Embeddings**: Automatic generation using Cohere's embedding API
-- **Library Organization**: Hierarchical structure for managing document collections
-- **Similarity Search**: Fast semantic search across documents and libraries
-
-### Technical Excellence
-- **Thread-Safe Operations**: Concurrent access support with proper locking mechanisms
-- **Structured Logging**: Comprehensive logging with performance metrics using `structlog`
-- **Type Safety**: Full type hints with mypy validation
-- **Docker Support**: Containerized deployment ready
-- **RESTful API**: OpenAPI/Swagger documentation included
-
-### Index Types
-
-The system supports multiple vector index implementations, each optimized for different use cases:
-
-| Index Type | Best For | Characteristics |
-|------------|----------|----------------|
-| **Naive** | Small datasets (< 1K vectors) | Simple linear search, exact results |
-| **LSH** | Large datasets, approximate search | Fast approximate nearest neighbor search |
-| **VPTree** | Medium datasets, exact search | Balanced performance with exact results |
-
----
-
-## 🏗️ Architecture
-
-This project follows **Domain-Driven Design (DDD)** principles with clean architecture and dependency injection:
+The project follows domain-driven design with strict layer separation and dependency injection throughout.
 
 ```
 src/vector_db/
-├── api/           # API layer (FastAPI routers, schemas, dependencies)
-├── application/   # Application services (business logic)
-├── domain/        # Domain models, interfaces, and exceptions
-└── infrastructure/ # Infrastructure (repositories, logging, external services)
+├── api/             # FastAPI routers, Pydantic schemas, DI wiring
+├── application/     # Service layer — orchestrates indexing, search, CRUD
+├── domain/          # Models (Library, Document, Chunk, Metadata), interfaces
+└── infrastructure/  # Index implementations, repositories, Cohere client, logging
+    └── indexes/     # Naive, LSH, VP-Tree (all from scratch)
 ```
 
-### Architecture Highlights
-
-- **Layered Design**: Clear separation between API, application, domain, and infrastructure layers
-- **Dependency Injection**: All services use abstract interfaces for testability and flexibility
-- **Domain Models**: Core business entities (Libraries, Documents, Chunks) with rich domain logic
-- **Repository Pattern**: Abstracted data access for easy testing and provider swapping
-- **Service Layer**: Orchestrates complex workflows like document processing and search
-
-### Key Components
-
-- **Libraries**: Top-level organizational units containing documents
-- **Documents**: Text content that gets automatically chunked and indexed
-- **Chunks**: Searchable pieces of text with vector embeddings
-- **Metadata**: Timestamps, tags, and user information for all entities
+**Design decisions:**
+- Repository pattern with in-memory stores behind abstract interfaces — swappable to any persistence backend without touching business logic
+- Immutable domain models with `.model_copy()` for updates
+- Cosine similarity with L2 normalization and edge-case handling (zero vectors, NaN/inf clamping)
+- Structured logging via `structlog` with JSON output for production and console output for development
+- Library-scoped indexes: each library maintains its own index instance, enabling per-library index type selection and clean isolation
 
 ---
 
-## 🛠️ Tech Stack
+## Engineering practices
 
-### Backend
-- **FastAPI** - Modern, fast web framework for building APIs
-- **Pydantic** - Data validation using Python type annotations
-- **Uvicorn** - Lightning-fast ASGI server
-
-### Vector Search & ML
-- **Cohere** - Embedding generation for semantic search
-- **NumPy** - Efficient vector operations and mathematical computations
-
-### Infrastructure
-- **Poetry** - Dependency management and packaging
-- **Docker** - Containerization for deployment
-- **Structlog** - Structured logging for observability
-
-### Testing & Quality
-- **Pytest** - Comprehensive testing framework
-- **Ruff** - Fast Python linter and formatter
-- **MyPy** - Static type checking
+- **Testing**: 150+ tests across three layers — unit (mocked dependencies), integration (component interactions), and semantic quality (real Cohere API calls validating search relevance). Coverage at 80%+.
+- **Type safety**: Full type annotations validated by mypy with strict configuration.
+- **Linting and formatting**: Ruff for both, enforced via pre-commit hooks alongside mypy.
+- **Concurrency**: Thread-safe index operations and repository access via reentrant locks.
+- **Containerization**: Docker image on Python 3.11-slim with Poetry-based dependency resolution.
 
 ---
 
-## 🚀 Quick Start
+## Roadmap
+
+Features not yet implemented that would strengthen this as a production retrieval system:
+
+- **Benchmarks**: Latency vs. recall vs. dataset size comparison across the three index types. The implementations exist — the quantitative evaluation does not yet.
+- **Hybrid search**: Combining BM25 lexical matching with vector similarity for better recall on keyword-heavy queries.
+- **Reranking**: A second-stage reranker (e.g., cross-encoder) to refine candidate sets returned by the ANN index.
+
+---
+
+## Quick start
 
 ### Prerequisites
 
 - Python 3.11+
-- Poetry for dependency management
+- Poetry
+- Cohere API key ([cohere.com](https://cohere.com/))
 - Docker (optional)
-- Cohere API key (for embedding generation)
 
 ### Installation
 
-1. **Clone the repository:**
 ```bash
 git clone https://github.com/mbenavente/ragsearch-engine
 cd ragsearch-engine
-```
-
-2. **Install dependencies:**
-```bash
 poetry install
 ```
 
-3. **Set up environment variables:**
+### Configuration
+
 ```bash
-# Copy the example environment file
 cp env.example .env
-
-# Edit .env and add your Cohere API key
-# Get your API key from https://cohere.com/
+# Add your COHERE_API_KEY to .env
 ```
 
-Or set the environment variable directly:
-```bash
-export COHERE_API_KEY="your_api_key_here"
-```
+### Run
 
-4. **Run the application:**
 ```bash
 poetry run uvicorn src.vector_db.api.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+API available at `http://localhost:8000`. Interactive docs at `/docs`.
 
-### Using Docker
-
-1. **Build the image:**
-```bash
-docker build -f docker/Dockerfile -t vector-db .
-```
-
-2. **Set up environment variables:**
-```bash
-# Copy the example environment file and edit it
-cp env.example .env
-# Edit .env and add your Cohere API key
-```
-
-3. **Run the container:**
-```bash
-docker run -p 8000:8000 --env-file .env vector-db
-```
-
-### Production Deployment
-
-**CORS Configuration:**
-For production deployments, configure CORS to restrict allowed origins:
+### Docker
 
 ```bash
-# In your .env file, specify allowed origins (comma-separated)
-CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+docker build -f docker/Dockerfile -t ragsearch-engine .
+docker run -p 8000:8000 --env-file .env ragsearch-engine
 ```
 
-**Security Notes:**
-- Default CORS allows all origins (`*`) for development convenience
-- **Always restrict CORS origins in production** to prevent unauthorized access
-- The API does not include authentication/authorization - consider adding middleware for production use
-- Use HTTPS in production to protect API keys and data in transit
+### Production notes
+
+- Set `CORS_ORIGINS` in `.env` to restrict allowed origins (defaults to `*` for development).
+- The API does not include authentication — add middleware for production use.
+- Use HTTPS to protect API keys and data in transit.
 
 ---
 
-## 📚 API Documentation
+## API
 
-Once running, visit:
-- **Interactive API docs**: `http://localhost:8000/docs`
-- **ReDoc documentation**: `http://localhost:8000/redoc`
-- **Health check**: `http://localhost:8000/health`
+Full OpenAPI documentation is available at `/docs` and `/redoc` when the server is running.
 
-### Core Endpoints
+### Libraries
 
-#### Libraries
-- `POST /api/v1/libraries/` - Create a new library
-- `GET /api/v1/libraries/` - List all libraries
-- `GET /api/v1/libraries/{library_id}` - Get library details
-- `PUT /api/v1/libraries/{library_id}` - Update library
-- `DELETE /api/v1/libraries/{library_id}` - Delete library
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/libraries/` | Create a library (specify index type and params) |
+| GET | `/api/v1/libraries/` | List all libraries |
+| GET | `/api/v1/libraries/{id}` | Get library details |
+| PUT | `/api/v1/libraries/{id}` | Update library |
+| DELETE | `/api/v1/libraries/{id}` | Delete library |
 
-#### Documents
-- `POST /api/v1/libraries/{library_id}/documents/` - Create document
-- `GET /api/v1/libraries/{library_id}/documents/` - List documents
-- `GET /api/v1/libraries/{library_id}/documents/{document_id}` - Get document
-- `PUT /api/v1/libraries/{library_id}/documents/{document_id}` - Update document
-- `DELETE /api/v1/libraries/{library_id}/documents/{document_id}` - Delete document
+### Documents
 
-#### Search
-- `POST /api/v1/libraries/{library_id}/search` - Search across all chunks in a library
-- `POST /api/v1/libraries/{library_id}/documents/{document_id}/search` - Search within a specific document
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/libraries/{id}/documents/` | Ingest a document (auto-chunks and embeds) |
+| GET | `/api/v1/libraries/{id}/documents/` | List documents |
+| GET | `/api/v1/libraries/{id}/documents/{doc_id}` | Get document |
+| PUT | `/api/v1/libraries/{id}/documents/{doc_id}` | Update document |
+| DELETE | `/api/v1/libraries/{id}/documents/{doc_id}` | Delete document |
 
-### Example Request
+### Search
 
-**Search Request:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/libraries/{id}/search` | Search across all chunks in a library |
+| POST | `/api/v1/libraries/{id}/documents/{doc_id}/search` | Search within a specific document |
+
+**Request:**
 ```json
 {
   "query_text": "machine learning algorithms",
@@ -228,7 +154,7 @@ Once running, visit:
 }
 ```
 
-**Search Response:**
+**Response:**
 ```json
 {
   "results": [
@@ -237,12 +163,7 @@ Once running, visit:
         "id": "chunk-uuid",
         "document_id": "doc-uuid",
         "text": "chunk content...",
-        "metadata": {
-          "creation_time": "2023-01-01T00:00:00Z",
-          "last_update": "2023-01-01T00:00:00Z",
-          "username": "user",
-          "tags": ["tag1"]
-        }
+        "metadata": { "creation_time": "...", "tags": ["tag1"] }
       },
       "similarity_score": 0.95
     }
@@ -254,164 +175,91 @@ Once running, visit:
 
 ---
 
-## 💡 Example Usage
-
-### Create a Library with Custom Index
+## Example usage
 
 ```bash
+# Create a library with LSH index
 curl -X POST "http://localhost:8000/api/v1/libraries" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Research Library",
+    "name": "Research Papers",
     "username": "researcher",
-    "tags": ["research", "papers"],
     "index_type": "lsh",
-    "index_params": {
-      "num_tables": 12,
-      "num_hyperplanes": 10
-    }
+    "index_params": { "num_tables": 12, "num_hyperplanes": 10 }
   }'
-```
 
-### Add a Document
-
-```bash
+# Ingest a document
 curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/documents" \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "This is my research document content...",
-    "chunk_size": 500,
-    "tags": ["important"]
+    "text": "Document content to index...",
+    "chunk_size": 500
   }'
-```
 
-### Search for Similar Content
-
-```bash
+# Search
 curl -X POST "http://localhost:8000/api/v1/libraries/${LIBRARY_ID}/search" \
   -H "Content-Type: application/json" \
-  -d '{
-    "query_text": "machine learning neural networks",
-    "k": 5
-  }'
+  -d '{ "query_text": "neural networks", "k": 5 }'
 ```
 
-### Demo Data Script
-
-Populate the database with sample data:
+### Demo data
 
 ```bash
-# Using VPTree index (default)
 poetry run python scripts/create_demo_data.py --index-type vptree
-
-# Using LSH index with custom parameters
 poetry run python scripts/create_demo_data.py --index-type lsh --index-params '{"num_tables": 4, "num_hyperplanes": 2}'
 ```
 
 ---
 
-## 🧪 Development
+## Development
 
-### Running Tests
+### Tests
 
-The project has **150+ tests** organized into three categories:
-
-**Quick Test Run (Recommended)**
 ```bash
-# Run fast tests (unit + integration, excludes semantic quality tests)
+# Fast tests (unit + integration)
 poetry run pytest -m "not semantic_quality"
-```
 
-**Full Test Suite**
-```bash
-# Run all tests including semantic quality (requires COHERE_API_KEY)
+# Full suite (requires COHERE_API_KEY)
 poetry run pytest
-```
 
-**Test Categories**
-```bash
-# Unit tests (fast, isolated components with mocked dependencies)
+# By layer
 poetry run pytest tests/unit/
-
-# Integration tests (component interactions with mocked external services)
 poetry run pytest tests/integration/
-
-# Semantic quality tests (slow, real Cohere API calls for search quality validation)
-export COHERE_API_KEY="your-api-key"
 poetry run pytest -m semantic_quality
-```
 
-**Additional Options**
-```bash
-# Run with coverage report
+# With coverage
 poetry run pytest tests/unit/ --cov=src/vector_db --cov-report=html
-
-# Run specific test file
-poetry run pytest tests/unit/test_domain_models.py
-
-# Verbose output for debugging
-poetry run pytest -v tests/integration/test_complete_workflow.py
 ```
 
-For detailed testing strategy, see the [Testing Strategy README](tests/README.md).
+See [tests/README.md](tests/README.md) for the full testing strategy.
 
-### Code Quality
+### Code quality
 
-**Format and lint code:**
 ```bash
 poetry run ruff format src/ tests/
 poetry run ruff check src/ tests/
-```
-
-**Type checking:**
-```bash
 poetry run mypy src/
 ```
 
-Pre-commit hooks are configured to run ruff formatting, linting, and mypy type checking automatically on each commit.
-
-### Logging
-
-The application uses structured logging with `structlog`:
-
-- **Production**: JSON format for log aggregation
-- **Development**: Human-readable console format
-- **Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-Configure logging in your environment:
-```python
-from src.vector_db.infrastructure.logging import configure_logging, LogLevel
-
-# Configure for production
-configure_logging(level=LogLevel.INFO, json_format=True)
-```
-
-Logs include:
-- Request/response information
-- Performance metrics
-- Error context and stack traces
-- Thread safety operations
-- Business logic events
+Pre-commit hooks run ruff and mypy automatically on each commit.
 
 ---
 
-## 📊 Project Statistics
+## Tech stack
 
-- **Test Coverage**: 80%+ across all layers
-- **Total Tests**: 150+ test cases
-- **Code Quality**: Type-checked with mypy, linted with ruff
-- **Architecture**: Clean architecture with DDD principles
-- **Documentation**: Comprehensive API docs with OpenAPI/Swagger
+| Category | Tool |
+|----------|------|
+| Framework | FastAPI, Pydantic, Uvicorn |
+| Embeddings | Cohere API |
+| Numerics | NumPy |
+| Logging | structlog |
+| Testing | pytest, pytest-asyncio, pytest-cov |
+| Quality | Ruff, mypy, pre-commit |
+| Packaging | Poetry |
+| Deployment | Docker |
 
 ---
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-<div align="center">
-
-**Built with ❤️ using Python and FastAPI**
-
-</div>
+MIT. See [LICENSE](LICENSE).
