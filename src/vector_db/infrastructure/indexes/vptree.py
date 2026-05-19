@@ -62,6 +62,7 @@ class VPTreeIndex(BaseVectorIndex):
         self.leaf_size = leaf_size
         self.root: Optional[VPTreeNode] = None
         self._rng = np.random.RandomState(42)
+        self._heap_counter = 0
 
     def _distance(self, embedding1: List[float], embedding2: List[float]) -> float:
         """Calculate distance between two embeddings (1 - cosine similarity)"""
@@ -162,7 +163,7 @@ class VPTreeIndex(BaseVectorIndex):
         query_embedding: List[float],
         k: int,
         min_similarity: float,
-        results: List[Tuple[float, Chunk]],
+        results: List[Tuple[float, int, Chunk]],
     ) -> None:
         """Recursively search VP-Tree with proper pruning"""
         if not node:
@@ -177,10 +178,12 @@ class VPTreeIndex(BaseVectorIndex):
                     )
                     if similarity >= min_similarity:
                         # Use min-heap for efficient k-NN
+                        # Counter as tiebreaker to avoid comparing Chunk objects
+                        self._heap_counter += 1
                         if len(results) < k:
-                            heapq.heappush(results, (similarity, chunk))
+                            heapq.heappush(results, (similarity, self._heap_counter, chunk))
                         elif similarity > results[0][0]:  # Better than worst in heap
-                            heapq.heapreplace(results, (similarity, chunk))
+                            heapq.heapreplace(results, (similarity, self._heap_counter, chunk))
             return
 
         # Handle internal nodes
@@ -191,10 +194,12 @@ class VPTreeIndex(BaseVectorIndex):
         similarity = self._cosine_similarity(query_embedding, node.chunk.embedding)
         if similarity >= min_similarity:
             # Use min-heap to keep track of top-k
+            # Counter as tiebreaker to avoid comparing Chunk objects
+            self._heap_counter += 1
             if len(results) < k:
-                heapq.heappush(results, (similarity, node.chunk))
+                heapq.heappush(results, (similarity, self._heap_counter, node.chunk))
             elif similarity > results[0][0]:  # Better than worst in heap
-                heapq.heapreplace(results, (similarity, node.chunk))
+                heapq.heapreplace(results, (similarity, self._heap_counter, node.chunk))
 
         # Calculate distance to vantage point
         query_distance = self._distance(query_embedding, node.chunk.embedding)
@@ -222,10 +227,11 @@ class VPTreeIndex(BaseVectorIndex):
             return []
 
         # Use heap for efficient k-NN search
-        results_heap: List[Tuple[float, Chunk]] = []
+        self._heap_counter = 0
+        results_heap: List[Tuple[float, int, Chunk]] = []
         self._search_tree(self.root, query_embedding, k, min_similarity, results_heap)
 
         # Convert min-heap to list and sort by similarity (descending)
-        results = [(chunk, similarity) for similarity, chunk in results_heap]
+        results = [(chunk, similarity) for similarity, _, chunk in results_heap]
         results.sort(key=lambda x: x[1], reverse=True)
         return results
