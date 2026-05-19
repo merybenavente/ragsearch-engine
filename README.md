@@ -1,6 +1,6 @@
 # RAG Search Engine
 
-A from-scratch approximate nearest neighbor search engine with three indexing strategies, built on FastAPI for RAG retrieval workloads.
+A RAG search engine built from scratch, implementing the ANN indexing algorithms (Naive, LSH, VP-Tree) instead of relying on libraries like FAISS or Annoy.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
